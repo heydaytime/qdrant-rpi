@@ -19,6 +19,7 @@ use crate::operations::point_ops::WriteOrdering;
 use crate::operations::shard_selector_internal::ShardSelectorInternal;
 use crate::operations::types::*;
 use crate::operations::{CollectionUpdateOperations, OperationWithClockTag};
+use crate::rpi::transform_point_operation_for_rpi;
 use crate::shards::shard::ShardId;
 use crate::shards::shard_trait::WaitUntil;
 
@@ -149,6 +150,20 @@ impl Collection {
         shard_keys_selection: Option<ShardKey>,
         hw_measurement_acc: HwMeasurementAcc,
     ) -> CollectionResult<UpdateResult> {
+        let rpi_config = self.collection_config.read().await.rpi_config.clone();
+        let operation = if let Some(rpi_config) = rpi_config {
+            match operation {
+                CollectionUpdateOperations::PointOperation(point_operation) => {
+                    CollectionUpdateOperations::PointOperation(transform_point_operation_for_rpi(
+                        point_operation,
+                        &rpi_config,
+                    ))
+                }
+                other => other,
+            }
+        } else {
+            operation
+        };
         let shard_holder = self.shards_holder.clone().read_owned().await;
         let start_time = std::time::Instant::now();
 

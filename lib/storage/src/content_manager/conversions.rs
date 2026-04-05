@@ -115,6 +115,7 @@ impl TryFrom<grpc::CreateCollection> for CollectionMetaOperations {
                 } else {
                     Some(json::proto_to_payloads(metadata)?)
                 },
+                rpi_config: None, // RPI not supported via gRPC yet
             },
         )?;
         Ok(CollectionMetaOperations::CreateCollection(op))

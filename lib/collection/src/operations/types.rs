@@ -53,6 +53,7 @@ use crate::config::{CollectionConfigInternal, CollectionParams, WalConfig};
 use crate::operations::cluster_ops::ReshardingDirection;
 use crate::operations::config_diff::{HnswConfigDiff, QuantizationConfigDiff};
 use crate::optimizers_builder::OptimizersConfig;
+use crate::rpi::RpiStats;
 use crate::shards::replica_set::replica_set_state::ReplicaState;
 use crate::shards::resharding::ReshardingStage;
 use crate::shards::shard::{PeerId, ShardId};
@@ -192,6 +193,7 @@ impl From<CollectionConfigInternal> for CollectionConfig {
             // Internal UUID to identify unique collections in consensus snapshots
             uuid: _,
             metadata,
+            rpi_config: _, // RPI config not exposed in public API config
         } = config;
 
         CollectionConfig {
@@ -233,6 +235,9 @@ pub struct CollectionInfo {
     /// Update queue info
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub update_queue: Option<UpdateQueueInfo>,
+    /// RPI runtime statistics, if RPI is enabled for the collection
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rpi_stats: Option<RpiStats>,
 }
 
 impl CollectionInfo {
@@ -254,6 +259,7 @@ impl CollectionInfo {
                 .map(|(k, v)| (k, PayloadIndexInfo::new(v, 0)))
                 .collect(),
             update_queue: Some(UpdateQueueInfo::default()),
+            rpi_stats: None,
         }
     }
 }
@@ -280,6 +286,7 @@ impl From<ShardInfoInternal> for CollectionInfo {
             config: CollectionConfig::from(config),
             payload_schema,
             update_queue: Some(UpdateQueueInfo::from(update_queue)),
+            rpi_stats: None,
         }
     }
 }

@@ -171,6 +171,7 @@ impl From<CollectionConfigInternal> for CollectionConfigTelemetry {
             strict_mode_config,
             uuid,
             metadata,
+            rpi_config: _, // RPI config not included in telemetry for now
         } = config;
         CollectionConfigTelemetry {
             params,

@@ -397,6 +397,7 @@ impl From<CollectionInfo> for api::grpc::qdrant::CollectionInfo {
             config,
             payload_schema,
             update_queue,
+            rpi_stats,
         } = value;
 
         let CollectionConfig {
@@ -556,6 +557,7 @@ impl From<CollectionInfo> for api::grpc::qdrant::CollectionInfo {
                 .map(api::grpc::qdrant::CollectionWarning::from)
                 .collect(),
             update_queue: update_queue.map(api::grpc::qdrant::UpdateQueueInfo::from),
+            rpi_stats: rpi_stats.map(api::grpc::qdrant::RpiStats::from),
         }
     }
 }
@@ -597,6 +599,54 @@ impl From<api::grpc::qdrant::UpdateQueueInfo> for UpdateQueueInfo {
         Self {
             length: length as usize,
             deferred_points: deferred_points.map(|i| i as usize),
+        }
+    }
+}
+
+impl From<crate::rpi::RpiStats> for api::grpc::qdrant::RpiStats {
+    fn from(value: crate::rpi::RpiStats) -> Self {
+        let crate::rpi::RpiStats {
+            total_searches,
+            shell_hit_distribution,
+            total_demotions,
+            total_promotions,
+            total_evictions,
+            average_search_depth,
+            rebalance_count,
+        } = value;
+
+        Self {
+            total_searches,
+            shell_hit_distribution,
+            total_demotions,
+            total_promotions,
+            total_evictions,
+            average_search_depth,
+            rebalance_count,
+        }
+    }
+}
+
+impl From<api::grpc::qdrant::RpiStats> for crate::rpi::RpiStats {
+    fn from(value: api::grpc::qdrant::RpiStats) -> Self {
+        let api::grpc::qdrant::RpiStats {
+            total_searches,
+            shell_hit_distribution,
+            total_demotions,
+            total_promotions,
+            total_evictions,
+            average_search_depth,
+            rebalance_count,
+        } = value;
+
+        Self {
+            total_searches,
+            shell_hit_distribution,
+            total_demotions,
+            total_promotions,
+            total_evictions,
+            average_search_depth,
+            rebalance_count,
         }
     }
 }
@@ -875,6 +925,7 @@ impl TryFrom<api::grpc::qdrant::GetCollectionInfoResponse> for CollectionInfo {
                     payload_schema,
                     warnings,
                     update_queue,
+                    rpi_stats,
                 } = collection_info_response;
                 Ok(Self {
                     status: CollectionStatus::try_from(status)?,
@@ -907,6 +958,7 @@ impl TryFrom<api::grpc::qdrant::GetCollectionInfoResponse> for CollectionInfo {
                         .try_collect()?,
                     warnings: warnings.into_iter().map(CollectionWarning::from).collect(),
                     update_queue: update_queue.map(UpdateQueueInfo::from),
+                    rpi_stats: rpi_stats.map(crate::rpi::RpiStats::from),
                 })
             }
         }

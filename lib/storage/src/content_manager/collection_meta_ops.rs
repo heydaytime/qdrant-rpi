@@ -8,6 +8,7 @@ use collection::operations::config_diff::{
 use collection::operations::types::{
     SparseVectorParams, SparseVectorsConfig, VectorsConfig, VectorsConfigDiff,
 };
+use collection::rpi::RpiConfig;
 use collection::shards::replica_set::replica_set_state::ReplicaState;
 use collection::shards::resharding::ReshardKey;
 use collection::shards::shard::{PeerId, ShardId, ShardsPlacement};
@@ -177,6 +178,11 @@ pub struct CreateCollection {
     /// such as creation time, migration data, inference model info, etc.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Payload>,
+    /// Radial Priority Indexing (RPI) configuration for quality-aware semantic caching.
+    /// When enabled, the collection automatically creates shell vectors for quality-based search.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(nested)]
+    pub rpi_config: Option<RpiConfig>,
 }
 
 /// Operation for creating new collection and (optionally) specify index params
@@ -434,6 +440,7 @@ impl From<CollectionConfigInternal> for CreateCollection {
             strict_mode_config,
             uuid,
             metadata,
+            rpi_config,
         } = value;
 
         let CollectionParams {
@@ -463,6 +470,7 @@ impl From<CollectionConfigInternal> for CreateCollection {
             strict_mode_config,
             uuid,
             metadata,
+            rpi_config,
         }
     }
 }

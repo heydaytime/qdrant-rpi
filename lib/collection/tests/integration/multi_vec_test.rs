@@ -64,6 +64,7 @@ pub async fn multi_vec_collection_fixture(collection_path: &Path, shard_number: 
         strict_mode_config: Default::default(),
         uuid: None,
         metadata: None,
+        rpi_config: None,
     };
 
     let snapshot_path = collection_path.join("snapshots");

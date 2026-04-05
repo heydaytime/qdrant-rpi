@@ -346,6 +346,7 @@ impl Collection {
                 config: _,
                 payload_schema,
                 update_queue,
+                rpi_stats: _,
             } = response;
             info.status = cmp::max(info.status, status);
             info.optimizer_status = cmp::max(info.optimizer_status, optimizer_status);
@@ -379,6 +380,10 @@ impl Collection {
                     .and_modify(|info_schema| info_schema.points += response_schema.points)
                     .or_insert(response_schema);
             }
+        }
+
+        if let Some(tracker) = &self.rpi_tracker {
+            info.rpi_stats = Some(tracker.get_stats());
         }
 
         Ok(info)

@@ -24,7 +24,7 @@ use clean::ShardCleanTasks;
 use common::budget::ResourceBudget;
 use common::save_on_disk::SaveOnDisk;
 use common::storage_version::StorageVersion;
-use segment::types::{SeqNumberType, ShardKey};
+use segment::types::{PointIdType, SeqNumberType, ShardKey};
 use semver::Version;
 use shard::operations::optimization::{OptimizationsRequestOptions, OptimizationsResponse};
 use tokio::runtime::Handle;
@@ -43,6 +43,7 @@ use crate::operations::config_diff::{DiffConfig, OptimizersConfigDiff};
 use crate::operations::shared_storage_config::SharedStorageConfig;
 use crate::operations::types::{CollectionError, CollectionResult, NodeType, OptimizersStatus};
 use crate::optimizers_builder::OptimizersConfig;
+use crate::rpi::{PointAccessData, SharedRpiTracker};
 use crate::shards::channel_service::ChannelService;
 use crate::shards::collection_shard_distribution::CollectionShardDistribution;
 use crate::shards::local_shard::clock_map::RecoveryPoint;
@@ -59,6 +60,7 @@ use crate::shards::transfer::transfer_tasks_pool::{TaskResult, TransferTasksPool
 use crate::shards::transfer::{ShardTransfer, ShardTransferMethod};
 use crate::shards::{CollectionId, replica_set};
 use crate::telemetry::CollectionsAggregatedTelemetry;
+use ahash::AHashMap;
 
 /// Collection's data is split into several shards.
 pub struct Collection {
@@ -89,6 +91,8 @@ pub struct Collection {
     collection_stats_cache: CollectionSizeStatsCache,
     // Background tasks to clean shards
     shard_clean_tasks: ShardCleanTasks,
+    rpi_tracker: Option<SharedRpiTracker>,
+    rpi_access: Option<Arc<parking_lot::RwLock<AHashMap<PointIdType, PointAccessData>>>>,
 }
 
 pub type RequestShardTransfer = Arc<dyn Fn(ShardTransfer) + Send + Sync>;
@@ -174,6 +178,15 @@ impl Collection {
         CollectionVersion::save(path)?;
         collection_config.save(path)?;
 
+        let rpi_tracker = collection_config
+            .rpi_config
+            .as_ref()
+            .map(|cfg| SharedRpiTracker::new(crate::rpi::RpiTracker::new(cfg.max_shells)));
+        let rpi_access = collection_config.rpi_config.as_ref().and_then(|cfg| {
+            cfg.track_lru
+                .then(|| Arc::new(parking_lot::RwLock::new(AHashMap::new())))
+        });
+
         Ok(Self {
             id: name.clone(),
             shards_holder: shared_shard_holder,
@@ -196,6 +209,8 @@ impl Collection {
             optimizer_resource_budget,
             collection_stats_cache,
             shard_clean_tasks: Default::default(),
+            rpi_tracker,
+            rpi_access,
         })
     }
 
@@ -291,6 +306,15 @@ impl Collection {
                 .expect("Failed to load collection size stats"),
         );
 
+        let rpi_tracker = collection_config
+            .rpi_config
+            .as_ref()
+            .map(|cfg| SharedRpiTracker::new(crate::rpi::RpiTracker::new(cfg.max_shells)));
+        let rpi_access = collection_config.rpi_config.as_ref().and_then(|cfg| {
+            cfg.track_lru
+                .then(|| Arc::new(parking_lot::RwLock::new(AHashMap::new())))
+        });
+
         Self {
             id: collection_id.clone(),
             shards_holder: shared_shard_holder,
@@ -313,6 +337,8 @@ impl Collection {
             optimizer_resource_budget,
             collection_stats_cache,
             shard_clean_tasks: Default::default(),
+            rpi_tracker,
+            rpi_access,
         }
     }
 

@@ -4,10 +4,12 @@ use std::sync::Arc;
 use collection::collection::Collection;
 use collection::config::{self, CollectionConfigInternal, CollectionParams, ShardingMethod};
 use collection::operations::config_diff::DiffConfig as _;
-use collection::operations::types::{CollectionResult, VectorsConfig};
+use collection::operations::types::{CollectionResult, VectorParams, VectorsConfig};
+use collection::rpi;
 use collection::shards::collection_shard_distribution::CollectionShardDistribution;
 use collection::shards::replica_set::replica_set_state::ReplicaState;
 use collection::shards::shard::{PeerId, ShardId};
+use segment::types::Distance;
 
 use super::{COLLECTION_DELETE_SPIN_INTERVAL, COLLECTION_DELETE_WAIT_TIMEOUT, TableOfContent};
 use crate::common::utils::try_unwrap_with_timeout_async;
@@ -43,6 +45,7 @@ impl TableOfContent {
             strict_mode_config,
             uuid,
             metadata,
+            rpi_config,
         } = operation;
 
         {
@@ -129,6 +132,13 @@ impl TableOfContent {
             };
         }
 
+        // RPI: Generate shell vectors if RPI is enabled
+        let vectors = if let Some(ref rpi_cfg) = rpi_config {
+            generate_rpi_shell_vectors(vectors, rpi_cfg)?
+        } else {
+            vectors
+        };
+
         let collection_params = CollectionParams {
             vectors,
             sparse_vectors,
@@ -202,6 +212,7 @@ impl TableOfContent {
             strict_mode_config,
             uuid,
             metadata,
+            rpi_config,
         };
 
         // No shard key mapping on creation, shard keys are set up after creating the collection
@@ -317,4 +328,95 @@ impl TableOfContent {
         }
         Ok(())
     }
+}
+
+/// Generate shell vectors for RPI-enabled collections.
+///
+/// This function takes the original vectors configuration and creates additional
+/// shell vectors (rpi_shell_1, rpi_shell_2, ..., rpi_shell_N) based on the source vector.
+///
+/// Shell 1 uses HNSW index (for fast queries), shells 2+ use Plain index (brute force).
+/// All shell vectors use Euclidean distance (required for RPI geometric properties).
+fn generate_rpi_shell_vectors(
+    vectors: VectorsConfig,
+    rpi_cfg: &rpi::RpiConfig,
+) -> Result<VectorsConfig, StorageError> {
+    use segment::data_types::vectors::DEFAULT_VECTOR_NAME;
+    use segment::types::VectorNameBuf;
+    use std::collections::BTreeMap;
+
+    // Get the source vector configuration
+    let source_name = rpi_cfg
+        .source_vector
+        .as_deref()
+        .unwrap_or(DEFAULT_VECTOR_NAME);
+    let source_params = vectors
+        .get_params(source_name)
+        .ok_or_else(|| {
+            StorageError::bad_input(format!(
+                "RPI source vector '{}' not found in vectors configuration",
+                source_name
+            ))
+        })?
+        .clone();
+
+    // Validate source vector has Euclidean distance or set it
+    // RPI requires Euclidean distance to preserve shell structure
+    if source_params.distance != Distance::Euclid {
+        log::warn!(
+            "RPI requires Euclidean distance for proper shell structure. \
+             Source vector '{}' uses {:?}. Shell vectors will use Euclidean.",
+            source_name,
+            source_params.distance
+        );
+    }
+
+    // Convert to Multi vectors config if Single
+    let mut multi_vectors: BTreeMap<VectorNameBuf, VectorParams> = match vectors {
+        VectorsConfig::Single(params) => {
+            let mut map = BTreeMap::new();
+            map.insert(DEFAULT_VECTOR_NAME.to_string().into(), params);
+            map
+        }
+        VectorsConfig::Multi(map) => map,
+    };
+
+    // Create shell vectors
+    for shell in 1..=rpi_cfg.max_shells {
+        let shell_name: VectorNameBuf = rpi::shell_vector_name(shell).into();
+
+        // Don't overwrite existing vectors
+        if multi_vectors.contains_key(&shell_name) {
+            return Err(StorageError::bad_input(format!(
+                "Vector '{}' already exists. RPI shell vectors cannot conflict with existing vectors.",
+                shell_name
+            )));
+        }
+
+        // Create shell vector params
+        // - Same dimension as source
+        // - Euclidean distance (required for RPI)
+        // - Shell 1: HNSW index for fast queries
+        // - Shell 2+: No HNSW (uses Plain/brute-force for rare queries)
+        let shell_params = VectorParams {
+            size: source_params.size,
+            distance: Distance::Euclid,
+            hnsw_config: if shell == 1 && rpi_cfg.hnsw_for_shell_one {
+                source_params.hnsw_config.clone()
+            } else {
+                // Disable HNSW for higher shells - they'll use brute force
+                // We achieve this by not specifying hnsw_config, which means
+                // the segment will fall back to the default behavior
+                None
+            },
+            quantization_config: source_params.quantization_config.clone(),
+            on_disk: source_params.on_disk,
+            datatype: source_params.datatype.clone(),
+            multivector_config: None, // Shell vectors don't support multivector
+        };
+
+        multi_vectors.insert(shell_name, shell_params);
+    }
+
+    Ok(VectorsConfig::Multi(multi_vectors))
 }

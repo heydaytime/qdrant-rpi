@@ -145,6 +145,7 @@ impl Collection {
                 strict_mode_config,
                 uuid: _,
                 metadata,
+                rpi_config: _, // RPI config is immutable after creation
             } = &new_config;
 
             let is_core_config_updated = params != &config.params

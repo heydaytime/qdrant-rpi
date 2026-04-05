@@ -1630,6 +1630,32 @@ pub struct UpdateQueueInfo {
 #[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RpiStats {
+    /// Total number of shell searches performed
+    #[prost(uint64, tag = "1")]
+    pub total_searches: u64,
+    /// Distribution of shell hits, where index = shell number and index 0 = miss
+    #[prost(uint64, repeated, tag = "2")]
+    pub shell_hit_distribution: ::prost::alloc::vec::Vec<u64>,
+    /// Number of demotion operations
+    #[prost(uint64, tag = "3")]
+    pub total_demotions: u64,
+    /// Number of promotion operations
+    #[prost(uint64, tag = "4")]
+    pub total_promotions: u64,
+    /// Number of evictions
+    #[prost(uint64, tag = "5")]
+    pub total_evictions: u64,
+    /// Running average shell depth for successful queries
+    #[prost(float, tag = "6")]
+    pub average_search_depth: f32,
+    /// Number of triggered rebalances
+    #[prost(uint64, tag = "7")]
+    pub rebalance_count: u64,
+}
+#[derive(serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CollectionInfo {
     /// operating condition of the collection
     #[prost(enumeration = "CollectionStatus", tag = "1")]
@@ -1661,6 +1687,9 @@ pub struct CollectionInfo {
     /// Update queue info
     #[prost(message, optional, tag = "12")]
     pub update_queue: ::core::option::Option<UpdateQueueInfo>,
+    /// RPI runtime stats, if RPI is enabled
+    #[prost(message, optional, tag = "13")]
+    pub rpi_stats: ::core::option::Option<RpiStats>,
 }
 #[derive(validator::Validate)]
 #[derive(serde::Serialize)]

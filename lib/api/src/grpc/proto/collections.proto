@@ -758,6 +758,23 @@ message UpdateQueueInfo {
   optional uint64 deferred_points = 2;
 }
 
+message RpiStats {
+  // Total number of shell searches performed
+  uint64 total_searches = 1;
+  // Distribution of shell hits, where index = shell number and index 0 = miss
+  repeated uint64 shell_hit_distribution = 2;
+  // Number of demotion operations
+  uint64 total_demotions = 3;
+  // Number of promotion operations
+  uint64 total_promotions = 4;
+  // Number of evictions
+  uint64 total_evictions = 5;
+  // Running average shell depth for successful queries
+  float average_search_depth = 6;
+  // Number of triggered rebalances
+  uint64 rebalance_count = 7;
+}
+
 message CollectionInfo {
   // operating condition of the collection
   CollectionStatus status = 1;
@@ -783,6 +800,8 @@ message CollectionInfo {
   repeated CollectionWarning warnings = 11;
   // Update queue info
   UpdateQueueInfo update_queue = 12;
+  // RPI runtime stats, if RPI is enabled
+  optional RpiStats rpi_stats = 13;
 }
 
 message ChangeAliases {

@@ -35,6 +35,53 @@ Qdrant is also available as a fully managed **[Qdrant Cloud](https://cloud.qdran
 </strong>
 </p>
 
+## Radial Priority Indexing (RPI) Fork
+
+This fork adds **Radial Priority Indexing (RPI)**: a feedback-driven semantic cache layer on top of Qdrant.
+
+RPI stores vectors in shell-specific named vectors (`rpi_shell_1`, `rpi_shell_2`, ... `rpi_shell_k`) and treats lower shells as higher trust.
+
+- `k=1` is the hot, high-quality shell.
+- `k>1` are lower-priority shells.
+- points can be promoted (`k -> k-1`) or demoted (`k -> k+1`) based on observed behavior.
+
+### How It Works
+
+1. **Write path**
+   - New points are transformed to include `rpi_shell_1` vectors.
+   - Collections with RPI enabled automatically add shell vector configs at creation.
+2. **Search path**
+   - Search runs shell fallthrough: shell 1 first, then 2..N until a hit.
+   - Query vectors are scaled per shell (`q_k = k * q`).
+   - Euclidean threshold uses `epsilon_k = epsilon_1 * k`.
+3. **Adaptation path**
+   - Frequently selected points are promoted toward shell 1.
+   - Poor/high-shell behavior can trigger demotion and eventual eviction.
+   - RPI metadata (`_rpi_*`) is persisted in payload.
+4. **Runtime optimization**
+   - Shell-1 read path is optimized to reduce write amplification.
+   - Shell 1 is intended to converge to high-quality results over repeated feedback cycles.
+
+### Configuration
+
+Enable RPI via `rpi_config` in collection creation. Main knobs:
+
+- `max_shells`: number of shells.
+- `base_epsilon`: base epsilon for shell-1; shell k uses `base_epsilon * k`.
+- `promotion_threshold`: hits required for promotion.
+- `demotion_threshold`: negative signals required for demotion.
+- `hnsw_for_shell_one`: keep shell 1 indexed with HNSW.
+- `track_lru`: enable in-memory access tracking.
+
+### Validation Tests Added
+
+RPI-specific integration tests live in `lib/collection/tests/integration/`:
+
+- `rpi_cache_logic_test.rs`: shell progression, demotion, eviction.
+- `rpi_semantic_feedback_test.rs`: semantic feedback correction vs baseline.
+- `rpi_performance_test.rs` (ignored by default): latency and convergence.
+- `rpi_scale_quality_test.rs` (ignored by default): large-scale quality convergence.
+
 ## Getting Started
 
 ### Python

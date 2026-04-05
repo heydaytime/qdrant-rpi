@@ -57,6 +57,7 @@ pub async fn handle_existing_collections(
             strict_mode_config,
             uuid,
             metadata,
+            rpi_config,
         } = config;
 
         let shards_number = params.shard_number.get();
@@ -79,6 +80,7 @@ pub async fn handle_existing_collections(
                 strict_mode_config,
                 uuid,
                 metadata,
+                rpi_config,
             },
         )
         .expect("Failed to create collection operation");

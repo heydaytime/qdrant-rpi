@@ -28,6 +28,7 @@ use crate::operations::types::{
 };
 use crate::operations::validation;
 use crate::optimizers_builder::OptimizersConfig;
+use crate::rpi::RpiConfig;
 
 pub const COLLECTION_CONFIG_FILE: &str = "config.json";
 
@@ -284,6 +285,11 @@ pub struct CollectionConfigInternal {
     /// such as creation time, migration data, inference model info, etc.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Payload>,
+    /// Radial Priority Indexing (RPI) configuration for quality-aware semantic caching.
+    /// When enabled, the collection uses shell-based quality encoding for vectors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(nested)]
+    pub rpi_config: Option<RpiConfig>,
 }
 
 impl CollectionConfigInternal {

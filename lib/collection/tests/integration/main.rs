@@ -7,4 +7,8 @@ mod grouping_test;
 mod lookup_test;
 mod multi_vec_test;
 mod pagination_test;
+mod rpi_cache_logic_test;
+mod rpi_performance_test;
+mod rpi_scale_quality_test;
+mod rpi_semantic_feedback_test;
 mod snapshot_recovery_test;
