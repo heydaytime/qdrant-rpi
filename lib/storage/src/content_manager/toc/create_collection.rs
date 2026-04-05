@@ -341,9 +341,10 @@ fn generate_rpi_shell_vectors(
     vectors: VectorsConfig,
     rpi_cfg: &rpi::RpiConfig,
 ) -> Result<VectorsConfig, StorageError> {
+    use std::collections::BTreeMap;
+
     use segment::data_types::vectors::DEFAULT_VECTOR_NAME;
     use segment::types::VectorNameBuf;
-    use std::collections::BTreeMap;
 
     // Get the source vector configuration
     let source_name = rpi_cfg

@@ -191,27 +191,39 @@ async fn upsert_batch(collection: &Collection, vectors: &[Vec<f32>]) {
         PointInsertOperationsInternal::from(batch),
     ));
     let result = collection
-        .update_from_client_simple(op, true, None, WriteOrdering::default(), HwMeasurementAcc::new())
+        .update_from_client_simple(
+            op,
+            true,
+            None,
+            WriteOrdering::default(),
+            HwMeasurementAcc::new(),
+        )
         .await
         .unwrap();
     assert_eq!(result.status, UpdateStatus::Completed);
 }
 
-async fn search_top_ids(collection: &Collection, vector: Vec<f32>, limit: usize) -> Vec<PointIdType> {
+async fn search_top_ids(
+    collection: &Collection,
+    vector: Vec<f32>,
+    limit: usize,
+) -> Vec<PointIdType> {
     let result = collection
         .core_search_batch(
             CoreSearchRequestBatch {
-                searches: vec![SearchRequestInternal {
-                    vector: vector.into(),
-                    with_payload: None,
-                    with_vector: None,
-                    filter: None,
-                    params: None,
-                    limit,
-                    offset: None,
-                    score_threshold: None,
-                }
-                .into()],
+                searches: vec![
+                    SearchRequestInternal {
+                        vector: vector.into(),
+                        with_payload: None,
+                        with_vector: None,
+                        filter: None,
+                        params: None,
+                        limit,
+                        offset: None,
+                        score_threshold: None,
+                    }
+                    .into(),
+                ],
             },
             None,
             ShardSelectorInternal::All,

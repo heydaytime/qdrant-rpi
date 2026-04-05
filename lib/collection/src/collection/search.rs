@@ -442,7 +442,6 @@ impl Collection {
                 log::debug!("Failed to persist RPI payload for point {point_id}: {err}");
             }
         }
-
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -824,7 +823,11 @@ impl Collection {
     }
 
     #[cfg(feature = "testing")]
-    fn snapshot_rpi_access_data(&self, point_id: PointIdType, current_shell: u8) -> PointAccessData {
+    fn snapshot_rpi_access_data(
+        &self,
+        point_id: PointIdType,
+        current_shell: u8,
+    ) -> PointAccessData {
         if let Some(access) = &self.rpi_access {
             if let Some(existing) = access.read().get(&point_id).cloned() {
                 let mut data = existing;

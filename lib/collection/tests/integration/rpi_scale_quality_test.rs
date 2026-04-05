@@ -15,9 +15,8 @@ use collection::operations::types::{PointRequestInternal, UpdateStatus, VectorsC
 use collection::operations::vector_params_builder::VectorParamsBuilder;
 use collection::rpi::{self, RpiConfig};
 use common::counter::hardware_accumulator::HwMeasurementAcc;
-use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rand::RngExt;
+use rand::{RngExt, SeedableRng};
 use segment::data_types::vectors::{DEFAULT_VECTOR_NAME, VectorStructInternal};
 use segment::types::{Distance, PointIdType, WithPayloadInterface, WithVector};
 use shard::search::CoreSearchRequestBatch;
@@ -96,14 +95,9 @@ async fn bench_rpi_quality_at_scale_vs_default() {
         rpi_epoch_acc.push(rpi_acc);
         wait_for_update_queue_to_drain(&rpi_collection).await;
 
-        let noisy_acc = train_with_feedback_epoch_noisy(
-            &rpi_noisy,
-            &intents,
-            TOP_K,
-            0.85,
-            &mut noisy_rng,
-        )
-        .await;
+        let noisy_acc =
+            train_with_feedback_epoch_noisy(&rpi_noisy, &intents, TOP_K, 0.85, &mut noisy_rng)
+                .await;
         noisy_epoch_acc.push(noisy_acc);
         wait_for_update_queue_to_drain(&rpi_noisy).await;
 
@@ -138,7 +132,10 @@ async fn bench_rpi_quality_at_scale_vs_default() {
         shell1_stats_noisy.1
     );
 
-    assert!(baseline_final < 0.25, "Baseline should stay confused at scale");
+    assert!(
+        baseline_final < 0.25,
+        "Baseline should stay confused at scale"
+    );
     assert!(
         rpi_final > 0.80,
         "RPI should converge to high top-1 quality after feedback"
@@ -200,11 +197,7 @@ fn perturb(base: &[f32], noise: f32, rng: &mut StdRng) -> Vec<f32> {
         .collect()
 }
 
-async fn collection_fixture(
-    path: &Path,
-    rpi_config: Option<RpiConfig>,
-    dim: usize,
-) -> Collection {
+async fn collection_fixture(path: &Path, rpi_config: Option<RpiConfig>, dim: usize) -> Collection {
     let wal_config = WalConfig {
         wal_capacity_mb: 1,
         wal_segments_ahead: 0,
@@ -224,7 +217,9 @@ async fn collection_fixture(
         }
         VectorsConfig::Multi(named)
     } else {
-        VectorParamsBuilder::new(dim as u64, Distance::Euclid).build().into()
+        VectorParamsBuilder::new(dim as u64, Distance::Euclid)
+            .build()
+            .into()
     };
 
     let collection_params = CollectionParams {
@@ -271,7 +266,13 @@ async fn upsert_batch(collection: &Collection, vectors: &[Vec<f32>]) {
         PointInsertOperationsInternal::from(batch),
     ));
     let result = collection
-        .update_from_client_simple(op, true, None, WriteOrdering::default(), HwMeasurementAcc::new())
+        .update_from_client_simple(
+            op,
+            true,
+            None,
+            WriteOrdering::default(),
+            HwMeasurementAcc::new(),
+        )
         .await
         .unwrap();
     assert_eq!(result.status, UpdateStatus::Completed);
@@ -288,7 +289,11 @@ async fn evaluate_top1_accuracy(collection: &Collection, intents: &[Intent], top
     hits as f32 / intents.len() as f32
 }
 
-async fn train_with_feedback_epoch(collection: &Collection, intents: &[Intent], top_k: usize) -> f32 {
+async fn train_with_feedback_epoch(
+    collection: &Collection,
+    intents: &[Intent],
+    top_k: usize,
+) -> f32 {
     let mut hits = 0usize;
     for intent in intents {
         let shown = search_top_ids(collection, intent.query.clone(), top_k).await;
@@ -324,7 +329,8 @@ async fn train_with_feedback_epoch_noisy(
             continue;
         }
 
-        let selected = if shown.contains(&intent.good_id) && rng.random::<f32>() < feedback_accuracy {
+        let selected = if shown.contains(&intent.good_id) && rng.random::<f32>() < feedback_accuracy
+        {
             intent.good_id
         } else {
             shown[0]
@@ -338,21 +344,27 @@ async fn train_with_feedback_epoch_noisy(
     hits as f32 / intents.len() as f32
 }
 
-async fn search_top_ids(collection: &Collection, vector: Vec<f32>, limit: usize) -> Vec<PointIdType> {
+async fn search_top_ids(
+    collection: &Collection,
+    vector: Vec<f32>,
+    limit: usize,
+) -> Vec<PointIdType> {
     let result = collection
         .core_search_batch(
             CoreSearchRequestBatch {
-                searches: vec![SearchRequestInternal {
-                    vector: vector.into(),
-                    with_payload: None,
-                    with_vector: None,
-                    filter: None,
-                    params: None,
-                    limit,
-                    offset: None,
-                    score_threshold: None,
-                }
-                .into()],
+                searches: vec![
+                    SearchRequestInternal {
+                        vector: vector.into(),
+                        with_payload: None,
+                        with_vector: None,
+                        filter: None,
+                        params: None,
+                        limit,
+                        offset: None,
+                        score_threshold: None,
+                    }
+                    .into(),
+                ],
             },
             None,
             ShardSelectorInternal::All,

@@ -13,13 +13,14 @@ use collection::operations::point_ops::{
 };
 use collection::operations::shard_selector_internal::ShardSelectorInternal;
 use collection::operations::types::{UpdateStatus, VectorsConfig};
-use collection::operations::vector_ops::{PointVectorsPersisted, UpdateVectorsOp, VectorOperations};
+use collection::operations::vector_ops::{
+    PointVectorsPersisted, UpdateVectorsOp, VectorOperations,
+};
 use collection::operations::vector_params_builder::VectorParamsBuilder;
 use collection::rpi::{self, RpiConfig};
 use common::counter::hardware_accumulator::HwMeasurementAcc;
-use rand::RngExt;
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::{RngExt, SeedableRng};
 use segment::data_types::vectors::DEFAULT_VECTOR_NAME;
 use segment::types::{Distance, PointIdType};
 use shard::operations::point_ops::{PointIdsList, VectorPersisted, VectorStructPersisted};
@@ -62,24 +63,21 @@ async fn bench_rpi_vs_default_behavior() {
         rebalance_threshold: 2.0,
     };
     let shell1_dir = Builder::new().prefix("rpi-perf-shell1").tempdir().unwrap();
-    let shell1_collection = collection_fixture(shell1_dir.path(), Some(rpi_cfg_shell1.clone())).await;
+    let shell1_collection =
+        collection_fixture(shell1_dir.path(), Some(rpi_cfg_shell1.clone())).await;
     upsert_batch(&shell1_collection, &vectors).await;
     run_queries(&shell1_collection, &queries, WARMUP).await;
     let rpi_shell1 = run_queries(&shell1_collection, &queries, QUERY_COUNT).await;
 
-    let converge_dir = Builder::new().prefix("rpi-perf-converge").tempdir().unwrap();
+    let converge_dir = Builder::new()
+        .prefix("rpi-perf-converge")
+        .tempdir()
+        .unwrap();
     let converge_collection =
         collection_fixture(converge_dir.path(), Some(rpi_cfg_shell1.clone())).await;
     upsert_batch(&converge_collection, &vectors).await;
 
-    force_hot_points_to_shell(
-        &converge_collection,
-        &query_ids,
-        &vectors,
-        3,
-        &[1, 2],
-    )
-    .await;
+    force_hot_points_to_shell(&converge_collection, &query_ids, &vectors, 3, &[1, 2]).await;
 
     let rpi_early = run_queries(&converge_collection, &queries, QUERY_COUNT / 2).await;
     wait_for_update_queue_to_drain(&converge_collection).await;
@@ -133,7 +131,9 @@ async fn collection_fixture(path: &Path, rpi_config: Option<RpiConfig>) -> Colle
         }
         VectorsConfig::Multi(named)
     } else {
-        VectorParamsBuilder::new(32, Distance::Euclid).build().into()
+        VectorParamsBuilder::new(32, Distance::Euclid)
+            .build()
+            .into()
     };
 
     let collection_params = CollectionParams {
@@ -181,7 +181,13 @@ async fn upsert_batch(collection: &Collection, vectors: &[Vec<f32>]) {
     ));
 
     let result = collection
-        .update_from_client_simple(op, true, None, WriteOrdering::default(), HwMeasurementAcc::new())
+        .update_from_client_simple(
+            op,
+            true,
+            None,
+            WriteOrdering::default(),
+            HwMeasurementAcc::new(),
+        )
         .await
         .unwrap();
     assert_eq!(result.status, UpdateStatus::Completed);
@@ -196,17 +202,19 @@ async fn run_queries(collection: &Collection, queries: &[Vec<f32>], count: usize
         let result = collection
             .core_search_batch(
                 CoreSearchRequestBatch {
-                    searches: vec![SearchRequestInternal {
-                        vector: query.into(),
-                        with_payload: None,
-                        with_vector: None,
-                        filter: None,
-                        params: None,
-                        limit: 5,
-                        offset: None,
-                        score_threshold: None,
-                    }
-                    .into()],
+                    searches: vec![
+                        SearchRequestInternal {
+                            vector: query.into(),
+                            with_payload: None,
+                            with_vector: None,
+                            filter: None,
+                            params: None,
+                            limit: 5,
+                            offset: None,
+                            score_threshold: None,
+                        }
+                        .into(),
+                    ],
                 },
                 None,
                 ShardSelectorInternal::All,

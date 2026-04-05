@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::num::NonZeroU32;
 use std::path::Path;
 
@@ -19,8 +18,7 @@ use collection::operations::vector_ops::{
 use collection::operations::vector_params_builder::VectorParamsBuilder;
 use collection::rpi::{self, RpiConfig};
 use common::counter::hardware_accumulator::HwMeasurementAcc;
-use segment::data_types::vectors::DEFAULT_VECTOR_NAME;
-use segment::data_types::vectors::VectorStructInternal;
+use segment::data_types::vectors::{DEFAULT_VECTOR_NAME, VectorStructInternal};
 use segment::types::{Distance, PointIdType, WithPayloadInterface};
 use shard::operations::point_ops::VectorPersisted;
 use shard::search::CoreSearchRequestBatch;
