@@ -14,7 +14,7 @@ use api::grpc::qdrant::update_collection_cluster_setup_request::{
 };
 use api::rest::schema::ShardKeySelector;
 use api::rest::{
-    BaseGroupRequest, LookupLocation, MaxOptimizationThreads, ShardKeyWithFallback, schema as rest,
+    schema as rest, BaseGroupRequest, LookupLocation, MaxOptimizationThreads, ShardKeyWithFallback,
 };
 use itertools::Itertools;
 use segment::common::operation_error::OperationError;
@@ -36,12 +36,11 @@ use super::types::{
     VectorsConfigDiff,
 };
 use crate::config::{
-    CollectionParams, ShardingMethod, WalConfig, default_replication_factor,
-    default_write_consistency_factor,
+    default_replication_factor, default_write_consistency_factor, CollectionParams, ShardingMethod,
+    WalConfig,
 };
-use crate::lookup::WithLookup;
 use crate::lookup::types::WithLookupInterface;
-use crate::operations::ClockTag;
+use crate::lookup::WithLookup;
 use crate::operations::cluster_ops::{
     AbortShardTransfer, AbortTransferOperation, ClusterOperations, CreateShardingKey,
     CreateShardingKeyOperation, DropReplicaOperation, DropShardingKey, DropShardingKeyOperation,
@@ -60,6 +59,7 @@ use crate::operations::types::{
     ShardTransferInfo, UpdateQueueInfo, UpdateResult, UpdateStatus, VectorParams, VectorsConfig,
 };
 use crate::operations::universal_query::collection_query::FeedbackStrategy;
+use crate::operations::ClockTag;
 use crate::optimizers_builder::OptimizersConfig;
 use crate::shards::remote_shard::CollectionCoreSearchRequest;
 use crate::shards::replica_set::replica_set_state::ReplicaState;
@@ -408,6 +408,7 @@ impl From<CollectionInfo> for api::grpc::qdrant::CollectionInfo {
             quantization_config,
             strict_mode_config,
             metadata,
+            rpi_config,
         } = config;
 
         let OptimizersConfig {
@@ -547,6 +548,7 @@ impl From<CollectionInfo> for api::grpc::qdrant::CollectionInfo {
                 metadata: metadata
                     .map(api::conversions::json::payload_to_proto)
                     .unwrap_or_default(),
+                rpi_config: rpi_config.map(api::grpc::qdrant::RpiConfig::from),
             }),
             payload_schema: payload_schema
                 .into_iter()
@@ -624,6 +626,88 @@ impl From<crate::rpi::RpiStats> for api::grpc::qdrant::RpiStats {
             average_search_depth,
             rebalance_count,
         }
+    }
+}
+
+impl From<crate::rpi::RpiConfig> for api::grpc::qdrant::RpiConfig {
+    fn from(value: crate::rpi::RpiConfig) -> Self {
+        let crate::rpi::RpiConfig {
+            max_shells,
+            base_epsilon,
+            source_vector,
+            demotion_threshold,
+            hnsw_for_shell_one,
+            track_lru,
+            promotion_threshold,
+            rebalance_threshold,
+        } = value;
+
+        Self {
+            max_shells: Some(u64::from(max_shells)),
+            base_epsilon: Some(base_epsilon),
+            source_vector,
+            demotion_threshold: Some(u64::from(demotion_threshold)),
+            hnsw_for_shell_one: Some(hnsw_for_shell_one),
+            track_lru: Some(track_lru),
+            promotion_threshold: Some(u64::from(promotion_threshold)),
+            rebalance_threshold: Some(rebalance_threshold),
+        }
+    }
+}
+
+impl TryFrom<api::grpc::qdrant::RpiConfig> for crate::rpi::RpiConfig {
+    type Error = Status;
+
+    fn try_from(value: api::grpc::qdrant::RpiConfig) -> Result<Self, Self::Error> {
+        let api::grpc::qdrant::RpiConfig {
+            max_shells,
+            base_epsilon,
+            source_vector,
+            demotion_threshold,
+            hnsw_for_shell_one,
+            track_lru,
+            promotion_threshold,
+            rebalance_threshold,
+        } = value;
+
+        let mut config = crate::rpi::RpiConfig::default();
+
+        if let Some(v) = max_shells {
+            config.max_shells = u8::try_from(v)
+                .map_err(|_| Status::invalid_argument("rpi_config.max_shells is too large"))?;
+        }
+
+        if let Some(v) = base_epsilon {
+            config.base_epsilon = v;
+        }
+
+        config.source_vector = source_vector;
+
+        if let Some(v) = demotion_threshold {
+            config.demotion_threshold = u8::try_from(v).map_err(|_| {
+                Status::invalid_argument("rpi_config.demotion_threshold is too large")
+            })?;
+        }
+
+        if let Some(v) = hnsw_for_shell_one {
+            config.hnsw_for_shell_one = v;
+        }
+
+        if let Some(v) = track_lru {
+            config.track_lru = v;
+        }
+
+        if let Some(v) = promotion_threshold {
+            config.promotion_threshold = u32::try_from(v).map_err(|_| {
+                Status::invalid_argument("rpi_config.promotion_threshold is too large")
+            })?;
+        }
+
+        if let Some(v) = rebalance_threshold {
+            config.rebalance_threshold = v;
+        }
+
+        Ok(config)
     }
 }
 
@@ -1915,6 +1999,7 @@ impl TryFrom<api::grpc::qdrant::CollectionConfig> for CollectionConfig {
             quantization_config,
             strict_mode_config,
             metadata,
+            rpi_config,
         } = config;
         Ok(Self {
             params: match params {
@@ -2015,6 +2100,9 @@ impl TryFrom<api::grpc::qdrant::CollectionConfig> for CollectionConfig {
             } else {
                 Some(api::conversions::json::proto_to_payloads(metadata)?)
             },
+            rpi_config: rpi_config
+                .map(crate::rpi::RpiConfig::try_from)
+                .transpose()?,
         })
     }
 }

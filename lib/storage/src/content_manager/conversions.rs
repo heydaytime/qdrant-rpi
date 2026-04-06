@@ -9,9 +9,10 @@ use collection::operations::config_diff::{
 };
 use collection::operations::conversions::sharding_method_from_proto;
 use collection::operations::types::{SparseVectorsConfig, VectorsConfigDiff};
+use collection::rpi::RpiConfig;
 use segment::types::{StrictModeConfig, StrictModeMultivectorConfig, StrictModeSparseConfig};
-use tonic::Status;
 use tonic::metadata::MetadataValue;
+use tonic::Status;
 
 use crate::content_manager::collection_meta_ops::{
     AliasOperations, ChangeAliasesOperation, CollectionMetaOperations, CreateAlias,
@@ -85,6 +86,7 @@ impl TryFrom<grpc::CreateCollection> for CollectionMetaOperations {
             sparse_vectors_config,
             strict_mode_config,
             metadata,
+            rpi_config,
         } = value;
         let op = CreateCollectionOperation::new(
             collection_name,
@@ -115,11 +117,61 @@ impl TryFrom<grpc::CreateCollection> for CollectionMetaOperations {
                 } else {
                     Some(json::proto_to_payloads(metadata)?)
                 },
-                rpi_config: None, // RPI not supported via gRPC yet
+                rpi_config: rpi_config.map(rpi_config_from_api).transpose()?,
             },
         )?;
         Ok(CollectionMetaOperations::CreateCollection(op))
     }
+}
+
+fn rpi_config_from_api(value: grpc::RpiConfig) -> Result<RpiConfig, Status> {
+    let grpc::RpiConfig {
+        max_shells,
+        base_epsilon,
+        source_vector,
+        demotion_threshold,
+        hnsw_for_shell_one,
+        track_lru,
+        promotion_threshold,
+        rebalance_threshold,
+    } = value;
+
+    let mut config = RpiConfig::default();
+
+    if let Some(v) = max_shells {
+        config.max_shells = u8::try_from(v)
+            .map_err(|_| Status::invalid_argument("rpi_config.max_shells is too large"))?;
+    }
+
+    if let Some(v) = base_epsilon {
+        config.base_epsilon = v;
+    }
+
+    config.source_vector = source_vector;
+
+    if let Some(v) = demotion_threshold {
+        config.demotion_threshold = u8::try_from(v)
+            .map_err(|_| Status::invalid_argument("rpi_config.demotion_threshold is too large"))?;
+    }
+
+    if let Some(v) = hnsw_for_shell_one {
+        config.hnsw_for_shell_one = v;
+    }
+
+    if let Some(v) = track_lru {
+        config.track_lru = v;
+    }
+
+    if let Some(v) = promotion_threshold {
+        config.promotion_threshold = u32::try_from(v)
+            .map_err(|_| Status::invalid_argument("rpi_config.promotion_threshold is too large"))?;
+    }
+
+    if let Some(v) = rebalance_threshold {
+        config.rebalance_threshold = v;
+    }
+
+    Ok(config)
 }
 
 pub fn strict_mode_from_api(value: grpc::StrictModeConfig) -> StrictModeConfig {

@@ -487,6 +487,8 @@ message CreateCollection {
   optional StrictModeConfig strict_mode_config = 17;
   // Arbitrary JSON metadata for the collection
   map<string, Value> metadata = 18;
+  // Radial Priority Indexing (RPI) configuration
+  optional RpiConfig rpi_config = 19;
 }
 
 message UpdateCollection {
@@ -584,6 +586,27 @@ message CollectionConfig {
   optional StrictModeConfig strict_mode_config = 6;
   // Arbitrary JSON metadata for the collection
   map<string, Value> metadata = 7;
+  // RPI configuration for this collection
+  optional RpiConfig rpi_config = 8;
+}
+
+message RpiConfig {
+  // Number of quality shells (k=1..max_shells)
+  optional uint64 max_shells = 1;
+  // Base shell-1 epsilon (Euclidean distance threshold)
+  optional float base_epsilon = 2;
+  // Source vector name to derive shell vectors from; default vector if not set
+  optional string source_vector = 3;
+  // Number of negative signals required before demotion
+  optional uint64 demotion_threshold = 4;
+  // Whether shell 1 keeps HNSW enabled
+  optional bool hnsw_for_shell_one = 5;
+  // Whether access tracking for promotion is enabled
+  optional bool track_lru = 6;
+  // Hit count required for promotion
+  optional uint64 promotion_threshold = 7;
+  // Average depth threshold that triggers rebalance flow
+  optional float rebalance_threshold = 8;
 }
 
 enum TokenizerType {

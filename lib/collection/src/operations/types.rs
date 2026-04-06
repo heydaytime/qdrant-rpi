@@ -23,7 +23,7 @@ use segment::common::anonymize::Anonymize;
 use segment::common::operation_error::{CancelledError, OperationError};
 use segment::data_types::groups::GroupId;
 use segment::data_types::modifier::Modifier;
-use segment::data_types::vectors::{DEFAULT_VECTOR_NAME, DenseVector};
+use segment::data_types::vectors::{DenseVector, DEFAULT_VECTOR_NAME};
 use segment::types::{
     Distance, Filter, HnswConfig, MultiVectorConfig, Payload, PayloadIndexInfo, PayloadKeyType,
     PointIdType, QuantizationConfig, SearchParams, SeqNumberType, ShardKey,
@@ -53,7 +53,7 @@ use crate::config::{CollectionConfigInternal, CollectionParams, WalConfig};
 use crate::operations::cluster_ops::ReshardingDirection;
 use crate::operations::config_diff::{HnswConfigDiff, QuantizationConfigDiff};
 use crate::optimizers_builder::OptimizersConfig;
-use crate::rpi::RpiStats;
+use crate::rpi::{RpiConfig, RpiStats};
 use crate::shards::replica_set::replica_set_state::ReplicaState;
 use crate::shards::resharding::ReshardingStage;
 use crate::shards::shard::{PeerId, ShardId};
@@ -179,6 +179,9 @@ pub struct CollectionConfig {
     /// such as creation time, migration data, inference model info, etc.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Payload>,
+    /// RPI configuration, if enabled at collection creation time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rpi_config: Option<RpiConfig>,
 }
 
 impl From<CollectionConfigInternal> for CollectionConfig {
@@ -193,7 +196,7 @@ impl From<CollectionConfigInternal> for CollectionConfig {
             // Internal UUID to identify unique collections in consensus snapshots
             uuid: _,
             metadata,
-            rpi_config: _, // RPI config not exposed in public API config
+            rpi_config,
         } = config;
 
         CollectionConfig {
@@ -204,6 +207,7 @@ impl From<CollectionConfigInternal> for CollectionConfig {
             quantization_config,
             strict_mode_config: strict_mode_config.map(StrictModeConfigOutput::from),
             metadata,
+            rpi_config,
         }
     }
 }

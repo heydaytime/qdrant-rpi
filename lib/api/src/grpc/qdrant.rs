@@ -1203,6 +1203,10 @@ pub struct CreateCollection {
     /// Arbitrary JSON metadata for the collection
     #[prost(map = "string, message", tag = "18")]
     pub metadata: ::std::collections::HashMap<::prost::alloc::string::String, Value>,
+    /// Radial Priority Indexing (RPI) configuration
+    #[prost(message, optional, tag = "19")]
+    #[validate(nested)]
+    pub rpi_config: ::core::option::Option<RpiConfig>,
 }
 #[derive(validator::Validate)]
 #[derive(serde::Serialize)]
@@ -1366,6 +1370,44 @@ pub struct CollectionConfig {
     /// Arbitrary JSON metadata for the collection
     #[prost(map = "string, message", tag = "7")]
     pub metadata: ::std::collections::HashMap<::prost::alloc::string::String, Value>,
+    /// RPI configuration for this collection
+    #[prost(message, optional, tag = "8")]
+    pub rpi_config: ::core::option::Option<RpiConfig>,
+}
+#[derive(validator::Validate)]
+#[derive(serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RpiConfig {
+    /// Number of quality shells (k=1..max_shells)
+    #[prost(uint64, optional, tag = "1")]
+    #[validate(range(min = 2, max = 20))]
+    pub max_shells: ::core::option::Option<u64>,
+    /// Base shell-1 epsilon (Euclidean distance threshold)
+    #[prost(float, optional, tag = "2")]
+    #[validate(range(min = 0.001, max = 10.0))]
+    pub base_epsilon: ::core::option::Option<f32>,
+    /// Source vector name to derive shell vectors from; default vector if not set
+    #[prost(string, optional, tag = "3")]
+    pub source_vector: ::core::option::Option<::prost::alloc::string::String>,
+    /// Number of negative signals required before demotion
+    #[prost(uint64, optional, tag = "4")]
+    #[validate(range(min = 1, max = 100))]
+    pub demotion_threshold: ::core::option::Option<u64>,
+    /// Whether shell 1 keeps HNSW enabled
+    #[prost(bool, optional, tag = "5")]
+    pub hnsw_for_shell_one: ::core::option::Option<bool>,
+    /// Whether access tracking for promotion is enabled
+    #[prost(bool, optional, tag = "6")]
+    pub track_lru: ::core::option::Option<bool>,
+    /// Hit count required for promotion
+    #[prost(uint64, optional, tag = "7")]
+    #[validate(range(min = 1, max = 1000))]
+    pub promotion_threshold: ::core::option::Option<u64>,
+    /// Average depth threshold that triggers rebalance flow
+    #[prost(float, optional, tag = "8")]
+    #[validate(range(min = 1.5, max = 10.0))]
+    pub rebalance_threshold: ::core::option::Option<f32>,
 }
 #[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
