@@ -176,13 +176,13 @@ async fn rpi_collection_fixture(path: &Path, rpi_config: RpiConfig) -> Collectio
 
     let base_params = VectorParamsBuilder::new(4, Distance::Euclid).build();
     let mut named_vectors = BTreeMap::new();
-    named_vectors.insert(DEFAULT_VECTOR_NAME.to_string().into(), base_params.clone());
+    named_vectors.insert(DEFAULT_VECTOR_NAME.to_string(), base_params.clone());
     for shell in 1..=rpi_config.max_shells {
         let mut shell_params = base_params.clone();
         if shell > 1 {
             shell_params.hnsw_config = None;
         }
-        named_vectors.insert(rpi::shell_vector_name(shell).into(), shell_params);
+        named_vectors.insert(rpi::shell_vector_name(shell), shell_params);
     }
 
     let collection_params = CollectionParams {
@@ -244,7 +244,7 @@ async fn update_shell_vector(
 ) {
     let mut vectors = HashMap::new();
     vectors.insert(
-        rpi::shell_vector_name(shell).into(),
+        rpi::shell_vector_name(shell),
         VectorPersisted::Dense(vector),
     );
 
@@ -274,7 +274,7 @@ async fn update_shell_vector(
 async fn delete_shell_vectors(collection: &Collection, point_id: PointIdType, shells: &[u8]) {
     let vector_names = shells
         .iter()
-        .map(|shell| rpi::shell_vector_name(*shell).into())
+        .map(|shell| rpi::shell_vector_name(*shell))
         .collect();
 
     let op = CollectionUpdateOperations::VectorOperation(VectorOperations::DeleteVectors(
@@ -380,7 +380,7 @@ async fn wait_for_shell_state(
 
     let record = retrieve_point(collection, point_id).await;
     let vectors = match record.vector {
-        Some(VectorStructInternal::Named(named)) => named.keys().map(|k| k.to_string()).collect(),
+        Some(VectorStructInternal::Named(named)) => named.keys().cloned().collect(),
         Some(VectorStructInternal::Single(_)) => vec!["<single>".to_string()],
         Some(VectorStructInternal::MultiDense(_)) => vec!["<multi_dense>".to_string()],
         None => vec!["<none>".to_string()],

@@ -207,13 +207,13 @@ async fn collection_fixture(path: &Path, rpi_config: Option<RpiConfig>, dim: usi
     let vectors_config = if let Some(cfg) = &rpi_config {
         let base = VectorParamsBuilder::new(dim as u64, Distance::Euclid).build();
         let mut named = BTreeMap::new();
-        named.insert(DEFAULT_VECTOR_NAME.to_string().into(), base.clone());
+        named.insert(DEFAULT_VECTOR_NAME.to_string(), base.clone());
         for shell in 1..=cfg.max_shells {
             let mut params = base.clone();
             if shell > 1 {
                 params.hnsw_config = None;
             }
-            named.insert(rpi::shell_vector_name(shell).into(), params);
+            named.insert(rpi::shell_vector_name(shell), params);
         }
         VectorsConfig::Multi(named)
     } else {
@@ -382,8 +382,8 @@ async fn sample_shell1_purity(collection: &Collection, intents: &[Intent]) -> (f
     let mut bad_in_shell1 = 0usize;
     let mut bad_checked = 0usize;
 
-    for intent_idx in 0..intents.len() {
-        let good_id = intents[intent_idx].good_id;
+    for (intent_idx, intent) in intents.iter().enumerate() {
+        let good_id = intent.good_id;
         if point_in_shell1(collection, good_id).await {
             good_in_shell1 += 1;
         }

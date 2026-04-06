@@ -97,7 +97,7 @@ impl ShellSearchParams {
         epsilon_override: Option<f32>,
     ) -> Self {
         let base_epsilon = epsilon_override.unwrap_or(config.base_epsilon);
-        let epsilon_k = base_epsilon * shell as f32;
+        let epsilon_k = base_epsilon * f32::from(shell);
 
         Self {
             shell,

@@ -48,7 +48,7 @@ pub const SHELL_VECTOR_PREFIX: &str = "rpi_shell_";
 
 /// Generate the vector name for a given shell number
 pub fn shell_vector_name(shell: u8) -> String {
-    format!("{}{}", SHELL_VECTOR_PREFIX, shell)
+    format!("{SHELL_VECTOR_PREFIX}{shell}")
 }
 
 /// Parse shell number from a vector name, returns None if not an RPI shell vector

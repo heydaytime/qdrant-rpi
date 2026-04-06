@@ -129,7 +129,7 @@ impl Hash for RpiConfig {
 impl RpiConfig {
     /// Calculate the epsilon (search radius) for a given shell
     pub fn epsilon_for_shell(&self, shell: u8) -> f32 {
-        self.base_epsilon * shell as f32
+        self.base_epsilon * f32::from(shell)
     }
 
     /// Convert epsilon to a score threshold for Euclidean distance.

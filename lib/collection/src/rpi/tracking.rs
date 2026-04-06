@@ -39,7 +39,7 @@ impl RpiTracker {
 
         // Update atomic counters for fast average calculation
         self.cumulative_depth
-            .fetch_add(shell as u64, Ordering::Relaxed);
+            .fetch_add(u64::from(shell), Ordering::Relaxed);
         self.hit_count.fetch_add(1, Ordering::Relaxed);
     }
 

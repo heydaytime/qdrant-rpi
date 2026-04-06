@@ -99,8 +99,7 @@ async fn test_semantic_feedback_demotes_bad_candidate_vs_default() {
 
     let rpi_good_total = rpi_good_top1_history.iter().filter(|&&v| v).count();
     println!(
-        "semantic-feedback comparison: baseline_good_top1={} rpi_good_top1={} last4_good={} final_baseline={:?} final_rpi={:?}",
-        baseline_good_top1, rpi_good_total, last_four_good, final_baseline, final_rpi
+        "semantic-feedback comparison: baseline_good_top1={baseline_good_top1} rpi_good_top1={rpi_good_total} last4_good={last_four_good} final_baseline={final_baseline:?} final_rpi={final_rpi:?}"
     );
 
     assert!(
@@ -134,13 +133,13 @@ async fn collection_fixture(path: &Path, rpi_config: Option<RpiConfig>) -> Colle
     let vectors_config = if let Some(cfg) = &rpi_config {
         let base = VectorParamsBuilder::new(4, Distance::Euclid).build();
         let mut named = BTreeMap::new();
-        named.insert(DEFAULT_VECTOR_NAME.to_string().into(), base.clone());
+        named.insert(DEFAULT_VECTOR_NAME.to_string(), base.clone());
         for shell in 1..=cfg.max_shells {
             let mut params = base.clone();
             if shell > 1 {
                 params.hnsw_config = None;
             }
-            named.insert(rpi::shell_vector_name(shell).into(), params);
+            named.insert(rpi::shell_vector_name(shell), params);
         }
         VectorsConfig::Multi(named)
     } else {

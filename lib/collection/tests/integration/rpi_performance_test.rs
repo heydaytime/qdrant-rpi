@@ -91,10 +91,7 @@ async fn bench_rpi_vs_default_behavior() {
     let l = summarize("rpi_late_after_promotion", &rpi_late);
     let steady = summarize("rpi_steady_shell1", &rpi_steady);
 
-    println!(
-        "\nRPI Perf Summary\n  {}\n  {}\n  {}\n  {}\n  {}\n",
-        b, s1, e, l, steady
-    );
+    println!("\nRPI Perf Summary\n  {b}\n  {s1}\n  {e}\n  {l}\n  {steady}\n");
 
     let shell1_delta = percent_delta(avg_ms(&rpi_shell1), avg_ms(&baseline));
     let late_vs_base = percent_delta(avg_ms(&rpi_late), avg_ms(&baseline));
@@ -102,8 +99,7 @@ async fn bench_rpi_vs_default_behavior() {
     let convergence_gain = percent_delta(avg_ms(&rpi_late), avg_ms(&rpi_early));
 
     println!(
-        "Delta vs baseline: shell1={:+.2}%, late={:+.2}%, steady={:+.2}%, convergence_gain={:+.2}%",
-        shell1_delta, late_vs_base, steady_vs_base, convergence_gain
+        "Delta vs baseline: shell1={shell1_delta:+.2}%, late={late_vs_base:+.2}%, steady={steady_vs_base:+.2}%, convergence_gain={convergence_gain:+.2}%"
     );
 
     base_collection.stop_gracefully().await;
@@ -121,13 +117,13 @@ async fn collection_fixture(path: &Path, rpi_config: Option<RpiConfig>) -> Colle
     let vectors_config = if let Some(cfg) = &rpi_config {
         let base = VectorParamsBuilder::new(32, Distance::Euclid).build();
         let mut named = BTreeMap::new();
-        named.insert(DEFAULT_VECTOR_NAME.to_string().into(), base.clone());
+        named.insert(DEFAULT_VECTOR_NAME.to_string(), base.clone());
         for shell in 1..=cfg.max_shells {
             let mut params = base.clone();
             if shell > 1 {
                 params.hnsw_config = None;
             }
-            named.insert(rpi::shell_vector_name(shell).into(), params);
+            named.insert(rpi::shell_vector_name(shell), params);
         }
         VectorsConfig::Multi(named)
     } else {
@@ -242,7 +238,7 @@ async fn force_hot_points_to_shell(
     for &id in hot_ids {
         let mut named = HashMap::new();
         named.insert(
-            rpi::shell_vector_name(shell).into(),
+            rpi::shell_vector_name(shell),
             VectorPersisted::Dense(rpi::scale_vector(&vectors[id], shell)),
         );
         points.push(PointVectorsPersisted {
@@ -271,7 +267,7 @@ async fn force_hot_points_to_shell(
 
     let remove_vector_names = remove_shells
         .iter()
-        .map(|s| rpi::shell_vector_name(*s).into())
+        .map(|s| rpi::shell_vector_name(*s))
         .collect();
     let remove_ids = hot_ids
         .iter()

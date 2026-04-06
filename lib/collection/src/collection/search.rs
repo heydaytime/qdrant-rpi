@@ -253,12 +253,12 @@ impl Collection {
                     )
                     .await?;
 
-                if let Some(found) = single_result.pop() {
-                    if !found.is_empty() {
-                        answering_shell = Some(shell);
-                        shell_result = found;
-                        break;
-                    }
+                if let Some(found) = single_result.pop()
+                    && !found.is_empty()
+                {
+                    answering_shell = Some(shell);
+                    shell_result = found;
+                    break;
                 }
             }
 
@@ -364,10 +364,8 @@ impl Collection {
             }
         }
 
-        if should_rebalance {
-            if let Some(tracker) = &self.rpi_tracker {
-                tracker.record_rebalance();
-            }
+        if should_rebalance && let Some(tracker) = &self.rpi_tracker {
+            tracker.record_rebalance();
         }
 
         if !passed_over_point_ids.is_empty() {
@@ -459,7 +457,7 @@ impl Collection {
             return Ok(Vec::new());
         }
 
-        let passover_limit = search_request.limit.max(8).min(64);
+        let passover_limit = search_request.limit.clamp(8, 64);
         let mut passed_over = AHashSet::new();
 
         for shell in 1..answering_shell {
@@ -648,7 +646,7 @@ impl Collection {
         let request = PointRequestInternal {
             ids: vec![point_id],
             with_payload: Some(WithPayloadInterface::Bool(false)),
-            with_vector: WithVector::Selector(vec![shell_name.clone().into()]),
+            with_vector: WithVector::Selector(vec![shell_name.clone()]),
         };
 
         let mut records = self
@@ -688,7 +686,7 @@ impl Collection {
 
         if let Some((insert_name, insert_vector)) = operation.insert_to {
             let mut vectors = HashMap::new();
-            vectors.insert(insert_name.into(), VectorPersisted::Dense(insert_vector));
+            vectors.insert(insert_name, VectorPersisted::Dense(insert_vector));
 
             let update_operation = CollectionUpdateOperations::VectorOperation(
                 VectorOperations::UpdateVectors(UpdateVectorsOp {
@@ -712,7 +710,7 @@ impl Collection {
 
         if let Some(delete_name) = operation.delete_from {
             let delete_operation = CollectionUpdateOperations::VectorOperation(
-                VectorOperations::DeleteVectors(vec![point_id].into(), vec![delete_name.into()]),
+                VectorOperations::DeleteVectors(vec![point_id].into(), vec![delete_name]),
             );
 
             self.update_from_client_simple(
@@ -828,12 +826,12 @@ impl Collection {
         point_id: PointIdType,
         current_shell: u8,
     ) -> PointAccessData {
-        if let Some(access) = &self.rpi_access {
-            if let Some(existing) = access.read().get(&point_id).cloned() {
-                let mut data = existing;
-                data.current_shell = current_shell;
-                return data;
-            }
+        if let Some(access) = &self.rpi_access
+            && let Some(existing) = access.read().get(&point_id).cloned()
+        {
+            let mut data = existing;
+            data.current_shell = current_shell;
+            return data;
         }
 
         PointAccessData {
@@ -1145,10 +1143,10 @@ fn rpi_request_for_shell(
     Some(CoreSearchRequest {
         query: QueryEnum::Nearest(NamedQuery {
             query: VectorInternal::Dense(params.scaled_query),
-            using: Some(params.vector_name.into()),
+            using: Some(params.vector_name),
         }),
         filter: request.filter.clone(),
-        params: request.params.clone(),
+        params: request.params,
         limit: request.limit,
         offset: request.offset,
         with_payload: request.with_payload.clone(),
@@ -1166,5 +1164,5 @@ fn should_persist_access_payload(answering_shell: u8, access_data: &PointAccessD
     // For shell 2+ keep payload writes sparse: persist at first hit,
     // near promotion boundaries, and periodically for observability.
     let hits = access_data.hit_count;
-    hits <= 2 || hits % 16 == 0
+    hits <= 2 || hits.is_multiple_of(16)
 }

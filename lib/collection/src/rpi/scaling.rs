@@ -19,7 +19,7 @@ use segment::data_types::vectors::DenseVector;
 /// A new vector with each component multiplied by k
 #[inline]
 pub fn scale_vector(vector: &[f32], k: u8) -> DenseVector {
-    let k_f32 = k as f32;
+    let k_f32 = f32::from(k);
     vector.iter().map(|&x| x * k_f32).collect()
 }
 
@@ -40,7 +40,7 @@ pub fn unscale_vector(scaled_vector: &[f32], k: u8) -> DenseVector {
         // Avoid division by zero, return as-is
         scaled_vector.to_vec()
     } else {
-        let k_f32 = k as f32;
+        let k_f32 = f32::from(k);
         scaled_vector.iter().map(|&x| x / k_f32).collect()
     }
 }

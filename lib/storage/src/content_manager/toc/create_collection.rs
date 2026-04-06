@@ -355,8 +355,7 @@ fn generate_rpi_shell_vectors(
         .get_params(source_name)
         .ok_or_else(|| {
             StorageError::bad_input(format!(
-                "RPI source vector '{}' not found in vectors configuration",
-                source_name
+                "RPI source vector '{source_name}' not found in vectors configuration"
             ))
         })?
         .clone();
@@ -376,7 +375,7 @@ fn generate_rpi_shell_vectors(
     let mut multi_vectors: BTreeMap<VectorNameBuf, VectorParams> = match vectors {
         VectorsConfig::Single(params) => {
             let mut map = BTreeMap::new();
-            map.insert(DEFAULT_VECTOR_NAME.to_string().into(), params);
+            map.insert(DEFAULT_VECTOR_NAME.to_string(), params);
             map
         }
         VectorsConfig::Multi(map) => map,
@@ -384,13 +383,12 @@ fn generate_rpi_shell_vectors(
 
     // Create shell vectors
     for shell in 1..=rpi_cfg.max_shells {
-        let shell_name: VectorNameBuf = rpi::shell_vector_name(shell).into();
+        let shell_name: VectorNameBuf = rpi::shell_vector_name(shell);
 
         // Don't overwrite existing vectors
         if multi_vectors.contains_key(&shell_name) {
             return Err(StorageError::bad_input(format!(
-                "Vector '{}' already exists. RPI shell vectors cannot conflict with existing vectors.",
-                shell_name
+                "Vector '{shell_name}' already exists. RPI shell vectors cannot conflict with existing vectors."
             )));
         }
 
@@ -403,7 +401,7 @@ fn generate_rpi_shell_vectors(
             size: source_params.size,
             distance: Distance::Euclid,
             hnsw_config: if shell == 1 && rpi_cfg.hnsw_for_shell_one {
-                source_params.hnsw_config.clone()
+                source_params.hnsw_config
             } else {
                 // Disable HNSW for higher shells - they'll use brute force
                 // We achieve this by not specifying hnsw_config, which means
@@ -412,7 +410,7 @@ fn generate_rpi_shell_vectors(
             },
             quantization_config: source_params.quantization_config.clone(),
             on_disk: source_params.on_disk,
-            datatype: source_params.datatype.clone(),
+            datatype: source_params.datatype,
             multivector_config: None, // Shell vectors don't support multivector
         };
 

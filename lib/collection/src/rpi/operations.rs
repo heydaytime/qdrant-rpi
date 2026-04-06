@@ -6,7 +6,6 @@
 use std::collections::HashMap;
 
 use segment::data_types::vectors::DEFAULT_VECTOR_NAME;
-use segment::types::VectorNameBuf;
 use shard::operations::point_ops::{
     BatchPersisted, BatchVectorStructPersisted, PointInsertOperationsInternal, PointOperations,
     PointStructPersisted, VectorPersisted, VectorStructPersisted,
@@ -73,7 +72,7 @@ fn transform_batch(batch: BatchPersisted, rpi_config: &RpiConfig) -> BatchPersis
         .as_deref()
         .unwrap_or(DEFAULT_VECTOR_NAME);
 
-    let shell_1_name: VectorNameBuf = shell_vector_name(1).into();
+    let shell_1_name = shell_vector_name(1);
 
     match batch.vectors {
         BatchVectorStructPersisted::Single(vectors) => {
@@ -84,9 +83,9 @@ fn transform_batch(batch: BatchPersisted, rpi_config: &RpiConfig) -> BatchPersis
                 .collect();
 
             // Convert to named vectors with both original and shell
-            let mut named: HashMap<VectorNameBuf, Vec<VectorPersisted>> = HashMap::new();
+            let mut named: HashMap<String, Vec<VectorPersisted>> = HashMap::new();
             named.insert(
-                DEFAULT_VECTOR_NAME.to_string().into(),
+                DEFAULT_VECTOR_NAME.to_string(),
                 vectors.into_iter().map(VectorPersisted::Dense).collect(),
             );
             named.insert(shell_1_name, shell_vectors);
@@ -116,9 +115,9 @@ fn transform_batch(batch: BatchPersisted, rpi_config: &RpiConfig) -> BatchPersis
                 .collect();
 
             // Convert to named vectors
-            let mut named: HashMap<VectorNameBuf, Vec<VectorPersisted>> = HashMap::new();
+            let mut named: HashMap<String, Vec<VectorPersisted>> = HashMap::new();
             named.insert(
-                DEFAULT_VECTOR_NAME.to_string().into(),
+                DEFAULT_VECTOR_NAME.to_string(),
                 vectors
                     .into_iter()
                     .map(VectorPersisted::MultiDense)
@@ -160,8 +159,7 @@ fn transform_batch(batch: BatchPersisted, rpi_config: &RpiConfig) -> BatchPersis
                 named_vectors.insert(shell_1_name, shell_vectors);
             } else {
                 log::warn!(
-                    "RPI source vector '{}' not found in batch - skipping shell vector creation",
-                    source_name
+                    "RPI source vector '{source_name}' not found in batch - skipping shell vector creation"
                 );
             }
 
@@ -184,16 +182,16 @@ fn transform_point(
         .as_deref()
         .unwrap_or(DEFAULT_VECTOR_NAME);
 
-    let shell_1_name: VectorNameBuf = shell_vector_name(1).into();
+    let shell_1_name = shell_vector_name(1);
 
     match &point.vector {
         VectorStructPersisted::Single(vector) => {
             // Single vector: scale it and convert to named
             let shell_vector = VectorPersisted::Dense(scale_vector(vector, 1));
 
-            let mut named: HashMap<VectorNameBuf, VectorPersisted> = HashMap::new();
+            let mut named: HashMap<String, VectorPersisted> = HashMap::new();
             named.insert(
-                DEFAULT_VECTOR_NAME.to_string().into(),
+                DEFAULT_VECTOR_NAME.to_string(),
                 VectorPersisted::Dense(vector.clone()),
             );
             named.insert(shell_1_name, shell_vector);
@@ -208,9 +206,9 @@ fn transform_point(
                 VectorPersisted::Dense(vec![])
             };
 
-            let mut named: HashMap<VectorNameBuf, VectorPersisted> = HashMap::new();
+            let mut named: HashMap<String, VectorPersisted> = HashMap::new();
             named.insert(
-                DEFAULT_VECTOR_NAME.to_string().into(),
+                DEFAULT_VECTOR_NAME.to_string(),
                 VectorPersisted::MultiDense(vectors.clone()),
             );
             named.insert(shell_1_name, shell_vector);
@@ -289,7 +287,7 @@ mod tests {
                 assert!(named.contains_key(DEFAULT_VECTOR_NAME));
 
                 // Should have shell 1 vector
-                let shell_1_name: VectorNameBuf = shell_vector_name(1).into();
+                let shell_1_name = shell_vector_name(1);
                 assert!(named.contains_key(&shell_1_name));
 
                 // Shell vector should be scaled by k=1 (unchanged)
@@ -326,7 +324,7 @@ mod tests {
                 assert_eq!(named.get(DEFAULT_VECTOR_NAME).unwrap().len(), 2);
 
                 // Should have shell 1 vectors
-                let shell_1_name: VectorNameBuf = shell_vector_name(1).into();
+                let shell_1_name = shell_vector_name(1);
                 assert!(named.contains_key(&shell_1_name));
                 assert_eq!(named.get(&shell_1_name).unwrap().len(), 2);
             }
