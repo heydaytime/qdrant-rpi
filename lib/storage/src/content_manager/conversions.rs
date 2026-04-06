@@ -11,8 +11,8 @@ use collection::operations::conversions::sharding_method_from_proto;
 use collection::operations::types::{SparseVectorsConfig, VectorsConfigDiff};
 use collection::rpi::RpiConfig;
 use segment::types::{StrictModeConfig, StrictModeMultivectorConfig, StrictModeSparseConfig};
-use tonic::metadata::MetadataValue;
 use tonic::Status;
+use tonic::metadata::MetadataValue;
 
 use crate::content_manager::collection_meta_ops::{
     AliasOperations, ChangeAliasesOperation, CollectionMetaOperations, CreateAlias,

@@ -14,7 +14,7 @@ use api::grpc::qdrant::update_collection_cluster_setup_request::{
 };
 use api::rest::schema::ShardKeySelector;
 use api::rest::{
-    schema as rest, BaseGroupRequest, LookupLocation, MaxOptimizationThreads, ShardKeyWithFallback,
+    BaseGroupRequest, LookupLocation, MaxOptimizationThreads, ShardKeyWithFallback, schema as rest,
 };
 use itertools::Itertools;
 use segment::common::operation_error::OperationError;
@@ -36,11 +36,12 @@ use super::types::{
     VectorsConfigDiff,
 };
 use crate::config::{
-    default_replication_factor, default_write_consistency_factor, CollectionParams, ShardingMethod,
-    WalConfig,
+    CollectionParams, ShardingMethod, WalConfig, default_replication_factor,
+    default_write_consistency_factor,
 };
-use crate::lookup::types::WithLookupInterface;
 use crate::lookup::WithLookup;
+use crate::lookup::types::WithLookupInterface;
+use crate::operations::ClockTag;
 use crate::operations::cluster_ops::{
     AbortShardTransfer, AbortTransferOperation, ClusterOperations, CreateShardingKey,
     CreateShardingKeyOperation, DropReplicaOperation, DropShardingKey, DropShardingKeyOperation,
@@ -59,7 +60,6 @@ use crate::operations::types::{
     ShardTransferInfo, UpdateQueueInfo, UpdateResult, UpdateStatus, VectorParams, VectorsConfig,
 };
 use crate::operations::universal_query::collection_query::FeedbackStrategy;
-use crate::operations::ClockTag;
 use crate::optimizers_builder::OptimizersConfig;
 use crate::shards::remote_shard::CollectionCoreSearchRequest;
 use crate::shards::replica_set::replica_set_state::ReplicaState;

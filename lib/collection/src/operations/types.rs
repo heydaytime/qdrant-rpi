@@ -23,7 +23,7 @@ use segment::common::anonymize::Anonymize;
 use segment::common::operation_error::{CancelledError, OperationError};
 use segment::data_types::groups::GroupId;
 use segment::data_types::modifier::Modifier;
-use segment::data_types::vectors::{DenseVector, DEFAULT_VECTOR_NAME};
+use segment::data_types::vectors::{DEFAULT_VECTOR_NAME, DenseVector};
 use segment::types::{
     Distance, Filter, HnswConfig, MultiVectorConfig, Payload, PayloadIndexInfo, PayloadKeyType,
     PointIdType, QuantizationConfig, SearchParams, SeqNumberType, ShardKey,
