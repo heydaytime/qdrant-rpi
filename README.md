@@ -122,9 +122,14 @@ Derived rule:
 This fork keeps existing Qdrant behavior where possible and adds RPI as an optional extension.
 
 Current integration notes:
-- `rpi_config` exists in collection creation metadata flow.
-- Collection info includes `rpi_stats`.
-- gRPC create-collection conversion currently sets `rpi_config: None` in storage conversion path; use REST/JSON config path where RPI config is expected.
+- `rpi_config` can be set when creating a collection via REST and gRPC.
+- `GetCollectionInfo` includes both `config.rpi_config` and `rpi_stats`.
+- There is no per-request RPI toggle: RPI behavior is selected by collection configuration.
+- If a collection does not have `rpi_config`, behavior is standard Qdrant behavior.
+
+Detailed docs:
+- `docs/RPI_ARCHITECTURE.md`
+- `docs/RPI_GRPC_GUIDE.md`
 
 ## Runtime stats
 
