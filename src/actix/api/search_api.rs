@@ -10,6 +10,7 @@ use itertools::Itertools;
 use storage::content_manager::collection_verification::check_strict_mode;
 use storage::dispatcher::Dispatcher;
 use tokio::time::Instant;
+use validator::Validate;
 
 use super::CollectionPath;
 use super::read_params::ReadParams;
@@ -326,11 +327,77 @@ async fn search_points_matrix_offsets(
     process_response(response, timing, request_hw_counter.to_rest_api())
 }
 
+#[post("/collections/{collection_name}/points/shell-search")]
+async fn shell_search_points(
+    dispatcher: web::Data<Dispatcher>,
+    collection: Path<CollectionPath>,
+    request: Json<api::rest::schema::ShellSearchRequest>,
+    params: Query<ReadParams>,
+    service_config: web::Data<ServiceConfig>,
+    ActixAuth(auth): ActixAuth,
+) -> HttpResponse {
+    let request = request.into_inner();
+
+    // Validate request
+    if let Err(err) = request.validate() {
+        return process_response_error(
+            storage::content_manager::errors::StorageError::bad_request(format!(
+                "Validation failed: {err}"
+            )),
+            Instant::now(),
+            None,
+        );
+    }
+
+    let request_hw_counter = get_request_hardware_counter(
+        &dispatcher,
+        collection.collection_name.clone(),
+        service_config.hardware_reporting(),
+        None,
+    );
+
+    let timing = Instant::now();
+
+    // Create verification pass
+    let pass = match check_strict_mode(
+        &request,
+        params.timeout_as_secs(),
+        &collection.collection_name,
+        &dispatcher,
+        &auth,
+    )
+    .await
+    {
+        Ok(pass) => pass,
+        Err(err) => return process_response_error(err, timing, None),
+    };
+
+    let shard_selection = match &request.shard_key {
+        Some(shard_key) => ShardSelectorInternal::from(shard_key.clone()),
+        None => ShardSelectorInternal::All,
+    };
+
+    let res = crate::common::query::do_shell_search_points(
+        dispatcher.toc(&auth, &pass),
+        &collection.collection_name,
+        request,
+        params.consistency,
+        shard_selection,
+        auth,
+        params.timeout(),
+        request_hw_counter.get_counter(),
+    )
+    .await;
+
+    process_response(res, timing, request_hw_counter.to_rest_api())
+}
+
 // Configure services
 pub fn config_search_api(cfg: &mut web::ServiceConfig) {
     cfg.service(search_points)
         .service(batch_search_points)
         .service(search_point_groups)
         .service(search_points_matrix_pairs)
-        .service(search_points_matrix_offsets);
+        .service(search_points_matrix_offsets)
+        .service(shell_search_points);
 }

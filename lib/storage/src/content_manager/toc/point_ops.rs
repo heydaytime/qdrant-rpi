@@ -668,4 +668,29 @@ impl TableOfContent {
 
         Ok(res)
     }
+
+    /// Apply RPI feedback for promotion/demotion of points between shells
+    pub async fn rpi_apply_feedback(
+        &self,
+        collection_name: &str,
+        shown_points: Vec<segment::types::PointIdType>,
+        selected_point: segment::types::PointIdType,
+        shard_selector: ShardSelectorInternal,
+        auth: Auth,
+    ) -> StorageResult<()> {
+        use crate::rbac::AccessRequirements;
+
+        let collection_pass = auth.check_collection_access(
+            collection_name,
+            AccessRequirements::new().write(),
+            "rpi_apply_feedback",
+        )?;
+
+        let collection = self.get_collection(&collection_pass).await?;
+
+        collection
+            .rpi_apply_feedback(&shown_points, selected_point, &shard_selector)
+            .await
+            .map_err(|e| StorageError::service_error(format!("RPI feedback failed: {e}")))
+    }
 }

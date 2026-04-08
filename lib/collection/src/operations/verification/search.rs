@@ -123,3 +123,25 @@ impl StrictModeVerification for SearchGroupsRequestInternal {
         None
     }
 }
+
+impl StrictModeVerification for api::rest::schema::ShellSearchRequest {
+    fn query_limit(&self) -> Option<usize> {
+        Some(self.limit)
+    }
+
+    fn indexed_filter_read(&self) -> Option<&Filter> {
+        None
+    }
+
+    fn request_exact(&self) -> Option<bool> {
+        Some(false)
+    }
+
+    fn request_search_params(&self) -> Option<&SearchParams> {
+        None
+    }
+
+    fn indexed_filter_write(&self) -> Option<&Filter> {
+        None
+    }
+}

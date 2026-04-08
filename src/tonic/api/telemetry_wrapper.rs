@@ -18,11 +18,11 @@ use api::grpc::qdrant::{
     ListSnapshotsResponse, PointsOperationResponse, QueryBatchPoints, QueryBatchResponse,
     QueryGroupsResponse, QueryPointGroups, QueryPoints, QueryResponse, RecommendBatchPoints,
     RecommendBatchResponse, RecommendGroupsResponse, RecommendPointGroups, RecommendPoints,
-    RecommendResponse, RecoverShardSnapshotRequest, RecoverSnapshotResponse, ScrollPoints,
-    ScrollResponse, SearchBatchPoints, SearchBatchResponse, SearchGroupsResponse,
+    RecommendResponse, RecoverShardSnapshotRequest, RecoverSnapshotResponse, RpiFeedbackPoints,
+    ScrollPoints, ScrollResponse, SearchBatchPoints, SearchBatchResponse, SearchGroupsResponse,
     SearchMatrixOffsetsResponse, SearchMatrixPairsResponse, SearchMatrixPoints, SearchPointGroups,
-    SearchPoints, SearchResponse, SetPayloadPoints, UpdateBatchPoints, UpdateBatchResponse,
-    UpdatePointVectors, UpsertPoints,
+    SearchPoints, SearchResponse, SetPayloadPoints, ShellSearchPoints, ShellSearchResponse,
+    UpdateBatchPoints, UpdateBatchResponse, UpdatePointVectors, UpsertPoints,
 };
 use tonic::{Request, Response, Status};
 
@@ -57,6 +57,26 @@ impl<T: Points> Points for PointsTelemetryWrapper<T> {
     ) -> Result<Response<PointsOperationResponse>, Status> {
         let cn = request.get_ref().collection_name.clone();
         let mut resp = self.inner.delete(request).await?;
+        resp.extensions_mut().insert(CollectionName(cn));
+        Ok(resp)
+    }
+
+    async fn rpi_feedback(
+        &self,
+        request: Request<RpiFeedbackPoints>,
+    ) -> Result<Response<PointsOperationResponse>, Status> {
+        let cn = request.get_ref().collection_name.clone();
+        let mut resp = self.inner.rpi_feedback(request).await?;
+        resp.extensions_mut().insert(CollectionName(cn));
+        Ok(resp)
+    }
+
+    async fn shell_search(
+        &self,
+        request: Request<ShellSearchPoints>,
+    ) -> Result<Response<ShellSearchResponse>, Status> {
+        let cn = request.get_ref().collection_name.clone();
+        let mut resp = self.inner.shell_search(request).await?;
         resp.extensions_mut().insert(CollectionName(cn));
         Ok(resp)
     }

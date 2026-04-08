@@ -758,7 +758,6 @@ impl Collection {
         }
     }
 
-    #[cfg(feature = "testing")]
     pub async fn rpi_apply_feedback(
         &self,
         shown_points: &[PointIdType],
@@ -820,7 +819,6 @@ impl Collection {
         Ok(())
     }
 
-    #[cfg(feature = "testing")]
     fn snapshot_rpi_access_data(
         &self,
         point_id: PointIdType,
@@ -841,7 +839,6 @@ impl Collection {
         }
     }
 
-    #[cfg(feature = "testing")]
     #[allow(clippy::too_many_arguments)]
     async fn detect_rpi_shell_for_point(
         &self,

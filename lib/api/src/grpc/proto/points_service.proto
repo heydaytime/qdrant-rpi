@@ -11,6 +11,12 @@ service Points {
   rpc Upsert(UpsertPoints) returns (PointsOperationResponse) {}
   // Delete points
   rpc Delete(DeletePoints) returns (PointsOperationResponse) {}
+  // Apply RPI feedback for promotion/demotion of points between shells
+  rpc RpiFeedback(RpiFeedbackPoints) returns (PointsOperationResponse) {}
+  // Perform RPI shell-based search
+  // Searches shells sequentially from k=1 to max_shells
+  // Returns results with shell metadata for quality-aware retrieval
+  rpc ShellSearch(ShellSearchPoints) returns (ShellSearchResponse) {}
   // Retrieve points
   rpc Get(GetPoints) returns (GetResponse) {}
   // Update named vectors for point

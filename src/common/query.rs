@@ -244,6 +244,89 @@ pub async fn do_get_points(
     .await
 }
 
+/// Perform RPI shell-based search
+/// This uses the collection's core_search_batch which automatically triggers RPI shell-sequential search
+#[allow(clippy::too_many_arguments)]
+pub async fn do_shell_search_points(
+    toc: &TableOfContent,
+    collection_name: &str,
+    request: api::rest::schema::ShellSearchRequest,
+    read_consistency: Option<ReadConsistency>,
+    shard_selection: ShardSelectorInternal,
+    auth: Auth,
+    timeout: Option<Duration>,
+    hw_measurement_acc: HwMeasurementAcc,
+) -> Result<api::rest::schema::ShellSearchResponse, StorageError> {
+    use std::time::Instant;
+
+    use collection::operations::query_enum::QueryEnum;
+    use segment::types::SearchParams;
+
+    let timing = Instant::now();
+
+    // Build CoreSearchRequest directly
+    // Convert Vec<f32> to VectorInternal
+    let vector_internal = segment::data_types::vectors::VectorInternal::from(request.vector);
+
+    // Build a NamedVectorStruct with default name
+    let named_vector = segment::data_types::vectors::NamedVectorStruct::new_from_vector(
+        vector_internal,
+        segment::data_types::vectors::DEFAULT_VECTOR_NAME,
+    );
+
+    let core_search_request = CoreSearchRequest {
+        query: QueryEnum::Nearest(named_vector.into()),
+        filter: None,
+        params: Some(SearchParams {
+            hnsw_ef: None,
+            exact: false,
+            quantization: None,
+            indexed_only: false,
+            acorn: None,
+        }),
+        limit: request.limit,
+        offset: 0,
+        with_payload: Some(request.with_payload.into()),
+        with_vector: Some(request.with_vector.into()),
+        score_threshold: None,
+    };
+
+    // Perform search using existing helper
+    let points = do_core_search_points(
+        toc,
+        collection_name,
+        core_search_request,
+        read_consistency,
+        shard_selection,
+        auth,
+        timeout,
+        hw_measurement_acc,
+    )
+    .await?;
+
+    let result_count = points.len();
+
+    // Convert ScoredPoint types
+    let converted_points: Vec<api::rest::ScoredPoint> =
+        points.into_iter().map(|p| p.into()).collect();
+
+    // Simple metadata
+    let metadata = api::rest::schema::ShellSearchMetadata {
+        hit_shell: 0,
+        searched_shells: 0,
+        definitive_miss: result_count == 0,
+        result_count,
+    };
+
+    let response = api::rest::schema::ShellSearchResponse {
+        result: converted_points,
+        metadata,
+        time: timing.elapsed().as_secs_f64(),
+    };
+
+    Ok(response)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn do_scroll_points(
     toc: &TableOfContent,

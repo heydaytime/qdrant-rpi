@@ -5206,6 +5206,32 @@ pub struct DeletePoints {
     #[prost(uint64, optional, tag = "6")]
     pub timeout: ::core::option::Option<u64>,
 }
+#[derive(serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RpiFeedbackPoints {
+    /// name of the collection
+    #[prost(string, tag = "1")]
+    pub collection_name: ::prost::alloc::string::String,
+    /// Wait until the changes have been applied?
+    #[prost(bool, optional, tag = "2")]
+    pub wait: ::core::option::Option<bool>,
+    /// List of point IDs that were shown to the user
+    #[prost(message, repeated, tag = "3")]
+    pub shown_points: ::prost::alloc::vec::Vec<PointId>,
+    /// The point ID that the user selected/clicked (gets promoted to better shell)
+    #[prost(message, optional, tag = "4")]
+    pub selected_point: ::core::option::Option<PointId>,
+    /// Write ordering guarantees
+    #[prost(message, optional, tag = "5")]
+    pub ordering: ::core::option::Option<WriteOrdering>,
+    /// Option for custom sharding to specify used shard keys
+    #[prost(message, optional, tag = "6")]
+    pub shard_key_selector: ::core::option::Option<ShardKeySelector>,
+    /// Timeout for the request in seconds
+    #[prost(uint64, optional, tag = "7")]
+    pub timeout: ::core::option::Option<u64>,
+}
 #[derive(validator::Validate)]
 #[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -5236,6 +5262,75 @@ pub struct GetPoints {
     /// If set, overrides global timeout setting for this request. Unit is seconds.
     #[prost(uint64, optional, tag = "8")]
     pub timeout: ::core::option::Option<u64>,
+}
+#[derive(serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShellSearchPoints {
+    /// name of the collection
+    #[prost(string, tag = "1")]
+    pub collection_name: ::prost::alloc::string::String,
+    /// Raw query vector (unscaled)
+    #[prost(float, repeated, tag = "2")]
+    pub vector: ::prost::alloc::vec::Vec<f32>,
+    /// Max number of results to return
+    #[prost(uint64, tag = "3")]
+    pub limit: u64,
+    /// Optional epsilon override for distance threshold
+    #[prost(float, optional, tag = "4")]
+    pub epsilon: ::core::option::Option<f32>,
+    /// Optional max shell override
+    #[prost(uint32, optional, tag = "5")]
+    pub max_shell: ::core::option::Option<u32>,
+    /// Include payload in response
+    #[prost(message, optional, tag = "6")]
+    pub with_payload: ::core::option::Option<WithPayloadSelector>,
+    /// Include vectors in response
+    #[prost(message, optional, tag = "7")]
+    pub with_vectors: ::core::option::Option<WithVectorsSelector>,
+    /// Read consistency
+    #[prost(message, optional, tag = "8")]
+    pub read_consistency: ::core::option::Option<ReadConsistency>,
+    /// Timeout in seconds
+    #[prost(uint64, optional, tag = "9")]
+    pub timeout: ::core::option::Option<u64>,
+    /// Shard key selector for custom sharding
+    #[prost(message, optional, tag = "10")]
+    pub shard_key_selector: ::core::option::Option<ShardKeySelector>,
+}
+#[derive(serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShellSearchMetadata {
+    /// Which shell produced the hit (0 = miss, 1-N = shell number)
+    #[prost(uint32, tag = "1")]
+    pub hit_shell: u32,
+    /// How many shells were searched before finding results
+    #[prost(uint32, tag = "2")]
+    pub searched_shells: u32,
+    /// Whether this is a definitive miss (searched all shells)
+    #[prost(bool, tag = "3")]
+    pub definitive_miss: bool,
+    /// Number of results returned
+    #[prost(uint64, tag = "4")]
+    pub result_count: u64,
+}
+#[derive(serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShellSearchResponse {
+    /// Search results
+    #[prost(message, repeated, tag = "1")]
+    pub result: ::prost::alloc::vec::Vec<ScoredPoint>,
+    /// Shell search metadata
+    #[prost(message, optional, tag = "2")]
+    pub metadata: ::core::option::Option<ShellSearchMetadata>,
+    /// Time spent
+    #[prost(double, tag = "3")]
+    pub time: f64,
+    /// Usage statistics
+    #[prost(message, optional, tag = "4")]
+    pub usage: ::core::option::Option<Usage>,
 }
 #[derive(validator::Validate)]
 #[derive(serde::Serialize)]
@@ -8055,6 +8150,58 @@ pub mod points_client {
             req.extensions_mut().insert(GrpcMethod::new("qdrant.Points", "Delete"));
             self.inner.unary(req, path, codec).await
         }
+        /// Apply RPI feedback for promotion/demotion of points between shells
+        pub async fn rpi_feedback(
+            &mut self,
+            request: impl tonic::IntoRequest<super::RpiFeedbackPoints>,
+        ) -> std::result::Result<
+            tonic::Response<super::PointsOperationResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/qdrant.Points/RpiFeedback",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("qdrant.Points", "RpiFeedback"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Perform RPI shell-based search
+        /// Searches shells sequentially from k=1 to max_shells
+        /// Returns results with shell metadata for quality-aware retrieval
+        pub async fn shell_search(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ShellSearchPoints>,
+        ) -> std::result::Result<
+            tonic::Response<super::ShellSearchResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/qdrant.Points/ShellSearch",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("qdrant.Points", "ShellSearch"));
+            self.inner.unary(req, path, codec).await
+        }
         /// Retrieve points
         pub async fn get(
             &mut self,
@@ -8738,6 +8885,24 @@ pub mod points_server {
             tonic::Response<super::PointsOperationResponse>,
             tonic::Status,
         >;
+        /// Apply RPI feedback for promotion/demotion of points between shells
+        async fn rpi_feedback(
+            &self,
+            request: tonic::Request<super::RpiFeedbackPoints>,
+        ) -> std::result::Result<
+            tonic::Response<super::PointsOperationResponse>,
+            tonic::Status,
+        >;
+        /// Perform RPI shell-based search
+        /// Searches shells sequentially from k=1 to max_shells
+        /// Returns results with shell metadata for quality-aware retrieval
+        async fn shell_search(
+            &self,
+            request: tonic::Request<super::ShellSearchPoints>,
+        ) -> std::result::Result<
+            tonic::Response<super::ShellSearchResponse>,
+            tonic::Status,
+        >;
         /// Retrieve points
         async fn get(
             &self,
@@ -9113,6 +9278,94 @@ pub mod points_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = DeleteSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/qdrant.Points/RpiFeedback" => {
+                    #[allow(non_camel_case_types)]
+                    struct RpiFeedbackSvc<T: Points>(pub Arc<T>);
+                    impl<T: Points> tonic::server::UnaryService<super::RpiFeedbackPoints>
+                    for RpiFeedbackSvc<T> {
+                        type Response = super::PointsOperationResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::RpiFeedbackPoints>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Points>::rpi_feedback(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = RpiFeedbackSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/qdrant.Points/ShellSearch" => {
+                    #[allow(non_camel_case_types)]
+                    struct ShellSearchSvc<T: Points>(pub Arc<T>);
+                    impl<T: Points> tonic::server::UnaryService<super::ShellSearchPoints>
+                    for ShellSearchSvc<T> {
+                        type Response = super::ShellSearchResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ShellSearchPoints>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Points>::shell_search(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ShellSearchSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

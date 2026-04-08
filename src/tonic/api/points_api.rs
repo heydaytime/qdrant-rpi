@@ -10,12 +10,14 @@ use api::grpc::qdrant::{
     FacetResponse, GetPoints, GetResponse, PointsOperationResponse, QueryBatchPoints,
     QueryBatchResponse, QueryGroupsResponse, QueryPointGroups, QueryPoints, QueryResponse,
     RecommendBatchPoints, RecommendBatchResponse, RecommendGroupsResponse, RecommendPointGroups,
-    RecommendPoints, RecommendResponse, ScrollPoints, ScrollResponse, SearchBatchPoints,
-    SearchBatchResponse, SearchGroupsResponse, SearchMatrixOffsets, SearchMatrixOffsetsResponse,
-    SearchMatrixPairs, SearchMatrixPairsResponse, SearchMatrixPoints, SearchPointGroups,
-    SearchPoints, SearchResponse, SetPayloadPoints, UpdateBatchPoints, UpdateBatchResponse,
-    UpdatePointVectors, UpsertPoints,
+    RecommendPoints, RecommendResponse, RpiFeedbackPoints, ScrollPoints, ScrollResponse,
+    SearchBatchPoints, SearchBatchResponse, SearchGroupsResponse, SearchMatrixOffsets,
+    SearchMatrixOffsetsResponse, SearchMatrixPairs, SearchMatrixPairsResponse, SearchMatrixPoints,
+    SearchPointGroups, SearchPoints, SearchResponse, SetPayloadPoints, ShellSearchPoints,
+    ShellSearchResponse, UpdateBatchPoints, UpdateBatchResponse, UpdatePointVectors, UpsertPoints,
 };
+use collection::operations::consistency_params::ReadConsistency;
+use collection::operations::shard_selector_internal::ShardSelectorInternal;
 use collection::operations::types::CoreSearchRequest;
 use common::counter::hardware_accumulator::HwMeasurementAcc;
 use storage::content_manager::toc::request_hw_counter::RequestHwCounter;
@@ -28,7 +30,7 @@ use super::validate;
 use crate::common::inference::api_keys::extract_inference_auth;
 use crate::common::inference::params::InferenceParams;
 use crate::common::strict_mode::*;
-use crate::common::update::InternalUpdateParams;
+use crate::common::update::{InternalUpdateParams, do_rpi_feedback};
 use crate::settings::ServiceConfig;
 use crate::tonic::auth::extract_auth;
 
@@ -108,6 +110,141 @@ impl Points for PointsService {
         )
         .await
         .map(|resp| resp.map(PointsOperationResponse::from))
+    }
+
+    async fn rpi_feedback(
+        &self,
+        mut request: Request<RpiFeedbackPoints>,
+    ) -> Result<Response<PointsOperationResponse>, Status> {
+        let auth = extract_auth(&mut request);
+        let inner_request = request.into_inner();
+        let collection_name = inner_request.collection_name.clone();
+        let wait = Some(inner_request.wait.unwrap_or(false));
+        let _hw_metrics =
+            self.get_request_collection_hw_usage_counter(collection_name.clone(), wait);
+
+        let shown_points: Vec<segment::types::PointIdType> = inner_request
+            .shown_points
+            .into_iter()
+            .map(|p| p.try_into())
+            .collect::<Result<_, _>>()
+            .map_err(|e| Status::invalid_argument(format!("Invalid point ID: {e}")))?;
+
+        let selected_point: segment::types::PointIdType = inner_request
+            .selected_point
+            .ok_or_else(|| Status::invalid_argument("selected_point is required"))?
+            .try_into()
+            .map_err(|e| Status::invalid_argument(format!("Invalid selected point ID: {e}")))?;
+
+        // Convert gRPC ShardKeySelector directly to ShardSelectorInternal
+        let shard_selector: ShardSelectorInternal = match inner_request.shard_key_selector {
+            Some(sk) => sk.try_into().map_err(|e| {
+                Status::invalid_argument(format!("Invalid shard key selector: {e}"))
+            })?,
+            None => ShardSelectorInternal::Empty,
+        };
+
+        let result = do_rpi_feedback(
+            &self.dispatcher,
+            collection_name.clone(),
+            shown_points,
+            selected_point,
+            shard_selector,
+            auth,
+        )
+        .await;
+
+        match result {
+            Ok(update_result) => {
+                let internal_response = points_operation_response_internal(
+                    std::time::Instant::now(),
+                    update_result,
+                    None, // No hardware usage tracking for now
+                );
+                let response = PointsOperationResponse::from(internal_response);
+                Ok(Response::new(response))
+            }
+            Err(e) => Err(Status::internal(format!("RPI feedback failed: {e}"))),
+        }
+    }
+
+    async fn shell_search(
+        &self,
+        mut request: Request<ShellSearchPoints>,
+    ) -> Result<Response<ShellSearchResponse>, Status> {
+        let auth = extract_auth(&mut request);
+
+        let inner_request = request.into_inner();
+        let collection_name = inner_request.collection_name.clone();
+        // Shell search doesn't have a wait field, pass None
+        let _hw_metrics =
+            self.get_request_collection_hw_usage_counter(collection_name.clone(), None);
+
+        // Convert gRPC request to internal ShellSearchRequest
+        let search_request = api::rest::schema::ShellSearchRequest {
+            vector: inner_request.vector,
+            limit: inner_request.limit as usize,
+            epsilon: inner_request.epsilon,
+            max_shell: inner_request.max_shell.map(|m| m as u8),
+            with_payload: inner_request.with_payload.is_some(),
+            with_vector: inner_request.with_vectors.is_some(),
+            shard_key: None, // Will use shard_key_selector below
+        };
+
+        let shard_selection = match inner_request.shard_key_selector {
+            Some(sk) => sk.try_into().map_err(|e| {
+                Status::invalid_argument(format!("Invalid shard key selector: {e}"))
+            })?,
+            None => ShardSelectorInternal::All,
+        };
+
+        let read_consistency = inner_request
+            .read_consistency
+            .map(ReadConsistency::try_from)
+            .transpose()
+            .map_err(|e| Status::invalid_argument(format!("Invalid read consistency: {e}")))?;
+
+        let timeout = inner_request.timeout.map(std::time::Duration::from_secs);
+
+        let verification_pass =
+            collection::operations::verification::new_unchecked_verification_pass();
+        let res = crate::common::query::do_shell_search_points(
+            self.dispatcher.toc(&auth, &verification_pass),
+            &collection_name,
+            search_request,
+            read_consistency,
+            shard_selection,
+            auth,
+            timeout,
+            _hw_metrics.get_counter(),
+        )
+        .await;
+
+        match res {
+            Ok(response) => {
+                // Convert rest ScoredPoints to grpc ScoredPoints
+                let grpc_points: Result<Vec<_>, _> =
+                    response.result.into_iter().map(|p| p.try_into()).collect();
+
+                let grpc_points =
+                    grpc_points.map_err(|e| Status::internal(format!("Conversion error: {e}")))?;
+
+                // Convert to gRPC response
+                let grpc_response = ShellSearchResponse {
+                    result: grpc_points,
+                    metadata: Some(api::grpc::qdrant::ShellSearchMetadata {
+                        hit_shell: response.metadata.hit_shell as u32,
+                        searched_shells: response.metadata.searched_shells as u32,
+                        definitive_miss: response.metadata.definitive_miss,
+                        result_count: response.metadata.result_count as u64,
+                    }),
+                    time: response.time,
+                    usage: None,
+                };
+                Ok(Response::new(grpc_response))
+            }
+            Err(e) => Err(Status::internal(format!("Shell search failed: {e}"))),
+        }
     }
 
     async fn get(&self, mut request: Request<GetPoints>) -> Result<Response<GetResponse>, Status> {

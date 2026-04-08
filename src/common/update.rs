@@ -9,7 +9,7 @@ use collection::operations::point_ops::*;
 use collection::operations::shard_selector_internal::ShardSelectorInternal;
 use collection::operations::types::{CollectionError, CollectionResult, UpdateResult};
 use collection::operations::vector_ops::*;
-use collection::operations::verification::*;
+use collection::operations::verification::{new_unchecked_verification_pass, *};
 use collection::shards::shard::ShardId;
 use common::counter::hardware_accumulator::HwMeasurementAcc;
 use schemars::JsonSchema;
@@ -427,6 +427,36 @@ pub async fn do_delete_points(
         hw_measurement_acc,
     )
     .await
+}
+
+pub async fn do_rpi_feedback(
+    dispatcher: &Dispatcher,
+    collection_name: String,
+    shown_points: Vec<segment::types::PointIdType>,
+    selected_point: segment::types::PointIdType,
+    shard_selector: ShardSelectorInternal,
+    auth: Auth,
+) -> Result<UpdateResult, StorageError> {
+    // Create verification pass for TOC access
+    let verification_pass = new_unchecked_verification_pass();
+    let toc = dispatcher.toc(&auth, &verification_pass);
+
+    // Call RPI feedback directly on TOC
+    toc.rpi_apply_feedback(
+        &collection_name,
+        shown_points,
+        selected_point,
+        shard_selector,
+        auth,
+    )
+    .await
+    .map_err(|e| StorageError::service_error(format!("RPI feedback failed: {e}")))?;
+
+    Ok(UpdateResult {
+        operation_id: None,
+        status: collection::operations::types::UpdateStatus::Completed,
+        clock_tag: None,
+    })
 }
 
 #[expect(clippy::too_many_arguments)]

@@ -5,6 +5,7 @@ use api::rest::UpdateVectors;
 use api::rest::schema::PointInsertOperations;
 use collection::operations::payload_ops::{DeletePayload, SetPayload};
 use collection::operations::point_ops::PointsSelector;
+use collection::operations::shard_selector_internal::ShardSelectorInternal;
 use collection::operations::vector_ops::DeleteVectors;
 use common::counter::hardware_accumulator::HwMeasurementAcc;
 use segment::json_path::JsonPath;
@@ -104,6 +105,40 @@ async fn delete_points(
         params.into_inner(),
         auth,
         request_hw_counter.get_counter(),
+    )
+    .await;
+
+    process_response(res, timing, request_hw_counter.to_rest_api())
+}
+
+#[post("/collections/{collection_name}/points/rpi-feedback")]
+async fn rpi_feedback(
+    dispatcher: web::Data<Dispatcher>,
+    collection: Path<CollectionPath>,
+    request: Json<api::rest::schema::RpiFeedbackRequest>,
+    params: Query<UpdateParams>,
+    service_config: web::Data<ServiceConfig>,
+    ActixAuth(auth): ActixAuth,
+) -> impl Responder {
+    let request = request.into_inner();
+
+    let request_hw_counter = get_request_hardware_counter(
+        &dispatcher,
+        collection.collection_name.clone(),
+        service_config.hardware_reporting(),
+        Some(params.wait),
+    );
+    let timing = Instant::now();
+
+    let shard_selector = ShardSelectorInternal::from(request.shard_key);
+
+    let res = do_rpi_feedback(
+        &dispatcher,
+        collection.into_inner().collection_name,
+        request.shown_points,
+        request.selected_point,
+        shard_selector,
+        auth,
     )
     .await;
 
@@ -474,6 +509,7 @@ async fn staging_operation(
 pub fn config_update_api(cfg: &mut web::ServiceConfig) {
     cfg.service(upsert_points)
         .service(delete_points)
+        .service(rpi_feedback)
         .service(update_vectors)
         .service(delete_vectors)
         .service(set_payload)

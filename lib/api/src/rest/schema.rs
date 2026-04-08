@@ -606,6 +606,76 @@ pub struct QueryRequestBatch {
     pub searches: Vec<QueryRequest>,
 }
 
+/// RPI Shell search request
+/// Performs sequential shell search for quality-aware retrieval
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Validate)]
+pub struct ShellSearchRequest {
+    /// The raw query vector (unscaled)
+    pub vector: DenseVector,
+
+    /// Maximum number of results to return
+    #[validate(range(min = 1))]
+    pub limit: usize,
+
+    /// Optional override for base epsilon distance threshold
+    pub epsilon: Option<f32>,
+
+    /// Maximum shell to search (defaults to collection's max_shells)
+    pub max_shell: Option<u8>,
+
+    /// Whether to include payload in results
+    #[serde(default)]
+    pub with_payload: bool,
+
+    /// Whether to include vectors in results
+    #[serde(default, alias = "with_vectors")]
+    pub with_vector: bool,
+
+    /// Optional shard key selector for custom sharding
+    pub shard_key: Option<ShardKeySelector>,
+}
+
+/// Shell search metadata for RPI responses
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ShellSearchMetadata {
+    /// Which shell produced the hit (0 = miss, 1-N = shell number)
+    pub hit_shell: u8,
+    /// How many shells were searched before finding results
+    pub searched_shells: u8,
+    /// Whether this is a definitive miss (searched all shells)
+    pub definitive_miss: bool,
+    /// Number of results returned
+    pub result_count: usize,
+}
+
+/// Shell search response with RPI metadata
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ShellSearchResponse {
+    /// Search results
+    pub result: Vec<ScoredPoint>,
+    /// RPI shell search metadata
+    pub metadata: ShellSearchMetadata,
+    /// Time spent in seconds
+    pub time: f64,
+}
+
+/// RPI Feedback Request
+/// Used to provide explicit feedback for promotion/demotion of points between RPI shells
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Validate)]
+pub struct RpiFeedbackRequest {
+    /// List of point IDs that were shown to the user
+    /// The selected_point will be promoted, all others will be demoted
+    #[validate(length(min = 1, message = "At least one point must be shown"))]
+    pub shown_points: Vec<PointIdType>,
+
+    /// The point ID that the user selected/clicked (gets promoted to better shell)
+    pub selected_point: PointIdType,
+
+    /// Optional shard key selector for custom sharding
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shard_key: Option<ShardKeySelector>,
+}
+
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct QueryResponse {
     pub points: Vec<ScoredPoint>,
